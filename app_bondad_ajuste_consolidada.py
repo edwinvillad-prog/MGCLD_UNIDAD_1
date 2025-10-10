@@ -5,7 +5,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from statsmodels.stats.diagnostic import lilliefors
+from lilliefors import lilliefors
 import plotly.graph_objects as go
 from scipy.stats import (
     chisquare, poisson, binom, hypergeom,
@@ -1012,4 +1012,5 @@ with tabs[5]:
                     "Comparar ambas curvas ayuda a decidir políticas de control: "
                     "reforzar refrigeración, ajustar tiempos de distribución o "
                     "establecer límites de seguridad en logística.")
+
 
