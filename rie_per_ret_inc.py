@@ -7,53 +7,65 @@ from math import exp, sqrt
 # ------------------------------------------------------
 # CONFIGURACIÓN GENERAL
 # ------------------------------------------------------
-st.set_page_config(page_title="Modelos Weibull y Riesgo en Leche", page_icon="🧮", layout="wide")
+st.set_page_config(page_title="Riesgo, Periodo de Retorno e Incertidumbre en Procesos Lácteos", page_icon="🧮", layout="wide")
 
-st.markdown("""
-<h1 style='text-align:center; color:#002F6C;'>🧮 Aplicaciones Weibull y Riesgo en Leche Cruda</h1>
-<h4 style='text-align:center; color:#F7B500;'>Universidad Politécnica Salesiana — Posgrados UPS</h4>
-<hr style='border:2px solid #002F6C;'>
+# === Colores institucionales UPS ===
+UPS_BLUE = "#002F6C"
+UPS_GOLD = "#F7B500"
+UPS_RED  = "#D32F2F"
+UPS_BG   = "#F8FAFF"
+
+st.markdown(f"""
+<h1 style='text-align:center; color:{UPS_BLUE};'>🧮 Riesgo, Periodo de Retorno e Incertidumbre en Procesos Lácteos</h1>
+<h4 style='text-align:center; color:{UPS_GOLD};'>Universidad Politécnica Salesiana — Posgrados UPS</h4>
+<hr style='border:2px solid {UPS_BLUE};'>
 """, unsafe_allow_html=True)
 
 # =========================================================
 # PESTAÑAS PRINCIPALES
 # =========================================================
-tabs = st.tabs(["📊 Modelo Weibull", "⚙️ Ejemplo CIP", "🥛 Muestras Leche", "📈 Intervalo Wilson"])
+tabs = st.tabs(["📊 Fallos de Equipos", "⚙️ Fallo en Bomba CIP", "🥛 Presencia de Contaminantes", "📈 Incertidumbre"])
 
 # =========================================================
 # 1️⃣ MODELO DE FALLOS WEIBULL
 # =========================================================
 with tabs[0]:
     st.subheader("Modelo de fallos Weibull — Confiabilidad de equipos lácteos")
+    st.markdown(f"<h5 style='color:{UPS_GOLD};'>Análisis del comportamiento de fallos en válvulas, bombas CIP y equipos de proceso</h5>", unsafe_allow_html=True)
+    st.markdown("El modelo Weibull permite caracterizar los patrones de fallos de equipos industriales a lo largo del tiempo, diferenciando entre fallas tempranas, aleatorias y por desgaste.")
 
     col_panel, col_plot = st.columns([1.2, 1.8])
 
     with col_panel:
         st.markdown("### Parámetros e interpretación en la industria láctea")
-        st.markdown("**β (forma):** Indica el patrón de fallas. En bombas CIP o válvulas, β>1 refleja desgaste, β≈1 fallas aleatorias y β<1 defectos de fabricación.")
-        st.markdown("**η (escala):** Vida característica del equipo, tiempo promedio donde falla el 63% de las unidades.")
-        st.markdown("**t (tiempo):** Periodo de operación analizado en días.")
+        st.markdown("**β (forma):** Controla el tipo de fallo. En bombas o válvulas: **β<1** → fallas tempranas (defectos); **β≈1** → aleatorias; **β>1** → desgaste progresivo.")
+        st.markdown("**η (escala):** Vida característica (≈ tiempo en el que falla el 63% de las unidades).")
+        st.markdown("**t (tiempo):** Horizonte de operación (días).")
 
         st.markdown("---")
         col1, col2 = st.columns(2)
         with col1:
-            beta1 = st.slider("β₁ Aleatorias", 0.5, 3.0, 1.0)
-            beta2 = st.slider("β₂ Desgaste", 0.5, 3.0, 1.5)
-            beta3 = st.slider("β₃ Tempranas", 0.5, 3.0, 0.7)
+            beta1 = st.slider("β₁ (Tempranas, β<1)", 0.20, 0.99, 0.90, help="Controla la tasa de fallas iniciales. Valores menores a 1 implican defectos de fabricación o instalación.")
+            beta3 = st.slider("β₂ (Desgaste, β>1)", 1.01, 3.00, 1.50, help="Representa fallas progresivas por envejecimiento de componentes o fricción.")
+            beta2 = st.slider("β₃ (Aleatorias, ≈1)", 0.90, 1.10, 1.00, help="Modela fallos aleatorios, asociados a eventos no predecibles.")
         with col2:
-            eta1 = st.slider("η₁ (Aleatorias, días)", 5, 50, 20)
-            eta2 = st.slider("η₂ (Desgaste, días)", 5, 50, 25)
-            eta3 = st.slider("η₃ (Tempranas, días)", 5, 50, 12)
-        t_max = st.slider("Tiempo máximo (días)", 10, 100, 40)
+            eta1 = st.slider("η₁ (Tempranas, días)", 5, 50, 20, help="Vida característica del equipo con fallas tempranas.")
+            eta2 = st.slider("η₂ (Desgaste, días)", 5, 50, 25, help="Tiempo medio de vida útil antes del desgaste significativo.")
+            eta3 = st.slider("η₃ (Aleatorias, días)", 5, 50, 12, help="Tiempo medio de vida bajo condiciones aleatorias.")
+        t_max = st.slider("Tiempo máximo (días)", 10, 120, 40)
 
     with col_plot:
         def weibull_R(t, beta, eta):
             return np.exp(-(t/eta)**beta)
 
-        t = np.linspace(0, t_max, 200)
+        t = np.linspace(0, t_max, 400)
         fig, ax = plt.subplots(figsize=(6,4))
-        for beta, eta, label in zip([beta1, beta2, beta3], [eta1, eta2, eta3], ["Aleatorias", "Desgaste", "Tempranas"]):
-            ax.plot(t, weibull_R(t, beta, eta), lw=2, label=f"β={beta:.2f}, η={eta:.1f} ({label})")
+        for beta, eta, label, color in zip(
+            [beta1, beta2, beta3],
+            [eta1, eta2, eta3],
+            ["Tempranas (β<1)", "Desgaste (β>1)", "Aleatorias (β≈1)"],
+            [UPS_RED, UPS_BLUE, UPS_GOLD]):
+            ax.plot(t, weibull_R(t, beta, eta), lw=2, label=f"{label}: β={beta:.2f}, η={eta:.1f}", color=color)
         ax.set_xlabel("t (días)")
         ax.set_ylabel("R(t)")
         ax.set_title("Curvas de Confiabilidad Weibull")
@@ -62,14 +74,13 @@ with tabs[0]:
         st.pyplot(fig)
 
         st.latex(r"R(t) = e^{-(t/\eta)^{\beta}}")
-        st.markdown("**Interpretación:** La función R(t) indica la probabilidad de que un equipo lácteo continúe operativo después del tiempo t. Una confiabilidad baja sugiere riesgo de interrupciones en procesos CIP o de pasteurización.")
+        st.caption("Donde R(t) representa la probabilidad de que el equipo continúe operativo tras t días; η es la vida característica y β define el tipo de fallo.")
 
-        # Tabla resumen
         st.markdown("### Resumen de parámetros ingresados")
         st.table({
-            'Tipo de falla': ['Aleatorias', 'Desgaste', 'Tempranas'],
+            'Tipo de falla': ['Tempranas', 'Desgaste', 'Aleatorias'],
             'β (forma)': [beta1, beta2, beta3],
-            'η (escala)': [eta1, eta2, eta3]
+            'η (escala, días)': [eta1, eta2, eta3]
         })
 
 # =========================================================
@@ -77,19 +88,21 @@ with tabs[0]:
 # =========================================================
 with tabs[1]:
     st.subheader("Ejemplo: Bomba CIP — Evaluación del riesgo de fallos")
+    st.markdown(f"<h5 style='color:{UPS_GOLD};'>Cálculo de la confiabilidad, MTBF y riesgo económico</h5>", unsafe_allow_html=True)
+    st.markdown("Este módulo estima la probabilidad de fallo, el tiempo medio hasta el fallo (MTBF) y el riesgo económico esperado para una bomba CIP.")
 
     col1, col2 = st.columns([1.2, 1.8])
     with col1:
         st.markdown("### Parámetros de entrada e interpretación")
-        st.markdown("**β:** Determina si las fallas son aleatorias o por desgaste (β>1 → deterioro mecánico).")
-        st.markdown("**η:** Vida media esperada de la bomba antes del fallo.")
-        st.markdown("**t:** Tiempo operativo o de revisión (en días).")
-        st.markdown("**Costo:** Pérdida económica por parada no planificada (USD).")
+        st.markdown("**β:** patrón de fallas (β>1 → desgaste del impulsor/sellos).")
+        st.markdown("**η:** vida media característica (días).")
+        st.markdown("**t:** tiempo operativo o revisión (días).")
+        st.markdown("**Costo:** pérdida económica por parada no planificada (USD).")
 
-        beta = st.number_input("β (forma)", 0.1, 5.0, 1.5)
-        eta = st.number_input("η (escala, días)", 1.0, 100.0, 25.0)
-        costo = st.number_input("Costo por parada (USD)", 0.0, 10000.0, 1200.0)
-        t_fail = st.slider("Tiempo de evaluación (días)", 1, 100, 20)
+        beta = st.number_input("β (forma)", 0.10, 5.00, 1.50)
+        eta = st.number_input("η (escala, días)", 1.0, 120.0, 25.0)
+        costo = st.number_input("Costo por parada (USD)", 0.0, 20000.0, 1200.0)
+        t_fail = st.slider("Tiempo de evaluación t (días)", 1, 120, 20)
 
     with col2:
         def weibull_MTBF(beta, eta):
@@ -99,47 +112,59 @@ with tabs[1]:
         MTBF = weibull_MTBF(beta, eta)
         riesgo = costo * P_fail
 
-        # Control dinámico de área bajo la curva
-        t = np.linspace(0, eta*2, 300)
+        t = np.linspace(0, int(eta*2), 400)
         R = np.exp(-(t/eta)**beta)
-
         fig, ax = plt.subplots(figsize=(6,4))
         ax.plot(t, R, 'b-', lw=2, label='Confiabilidad R(t)')
-        ax.fill_between(t, R, 0, where=(t<=t_fail), color='red', alpha=0.3, label='Área de probabilidad de fallo')
+        ax.fill_between(t, R, 0, where=(t<=t_fail), color=UPS_RED, alpha=0.3, label='P(fallo antes de t)')
+        ax.axvline(t_fail, color='k', ls='--', lw=1)
         ax.legend()
         ax.set_xlabel('Tiempo (días)')
         ax.set_ylabel('R(t)')
-        ax.set_title('Evolución de la confiabilidad y probabilidad de fallo')
+        ax.set_title('Confiabilidad y probabilidad acumulada de fallo')
         ax.grid(True)
         st.pyplot(fig)
 
         st.latex(r"P(T \leq t) = 1 - e^{-(t/\eta)^{\beta}}")
-        st.latex(r"E[T] = \eta \Gamma(1 + 1/\beta)")
-        st.latex(r"Riesgo = Costo \times P(T \leq t)")
+        st.caption("Probabilidad acumulada de fallo antes del tiempo t.")
+        st.latex(r"E[T] = \eta \, \Gamma\!\left(1 + \frac{1}{\beta}\right)")
+        st.caption("MTBF: tiempo medio esperado hasta el fallo.")
+        st.latex(r"\text{Riesgo esperado} = Costo \times P(T \leq t)")
+        st.caption("Valor económico esperado asociado al fallo dentro del intervalo analizado.")
 
-        st.markdown(f"**Probabilidad de fallo antes de {t_fail} días:** <span style='color:red; font-weight:bold;'>{P_fail:.3f}</span>", unsafe_allow_html=True)
-        st.markdown(f"**MTBF (tiempo medio entre fallos):** <span style='color:blue; font-weight:bold;'>{MTBF:.2f} días</span>", unsafe_allow_html=True)
-        st.markdown(f"**Riesgo económico estimado:** <span style='color:#F7B500; font-weight:bold;'>{riesgo:.0f} USD</span>", unsafe_allow_html=True)
-
-        st.markdown("**Interpretación:** El área roja bajo la curva representa la probabilidad acumulada de fallo antes del tiempo t. En una planta láctea, este valor apoya la planificación de mantenimientos preventivos y la gestión del riesgo operativo.")
+        st.markdown(f"""
+        <div style='background:{UPS_BG};border-left:4px solid {UPS_BLUE};padding:10px;border-radius:6px;'>
+        <b>Conclusiones:</b><br>
+        • <b>Probabilidad de fallo antes de t:</b> <span style='color:{UPS_RED};font-weight:700'>{P_fail:.3f}</span><br>
+        • <b>MTBF (tiempo medio hasta el fallo):</b> <span style='color:{UPS_BLUE};font-weight:700'>{MTBF:.2f} días</span><br>
+        • <b>Riesgo económico esperado:</b> <span style='color:#F57C00;font-weight:700'>{riesgo:.0f} USD</span><br>
+        <i>Interpretación láctea:</i> El área roja cuantifica la fracción de bombas que fallarán antes de t días; útil para programar mantenimientos preventivos.
+        </div>
+        """, unsafe_allow_html=True)
 
 # =========================================================
 # 3️⃣ MUESTRAS POSITIVAS EN LECHE CRUDA
 # =========================================================
 with tabs[2]:
     st.subheader("Muestras positivas en leche cruda — Probabilidad acumulada y periodo de retorno")
+    st.markdown(f"<h5 style='color:{UPS_GOLD};'>Modelado de la detección de contaminantes y estimación de frecuencia esperada</h5>", unsafe_allow_html=True)
 
     col1, col2 = st.columns([1.2, 1.8])
     with col1:
-        p = st.slider("Probabilidad de positivo (p)", 0.001, 0.2, 0.03)
-        n_max = st.slider("Semanas a evaluar", 5, 100, 40)
+        p = st.slider("Probabilidad de positivo semanal p", 0.001, 0.2, 0.03, help="Proporción esperada de muestras positivas por antibióticos.")
+        n_max = st.slider("Semanas a visualizar (curva)", 5, 100, 40, help="Duración del monitoreo en semanas.")
+        n_eval = st.number_input("Semanas de interés n (cálculo puntual)", 1, 1000, 20, help="Número de semanas para el cálculo puntual.")
 
     with col2:
         n = np.arange(1, n_max+1)
-        P_pos = 1 - (1 - p)**n
+        P_curve = 1 - (1 - p)**n
         T = 1 / p
+        P_puntual = 1 - (1 - p)**n_eval
+
         fig2, ax2 = plt.subplots(figsize=(6,4))
-        ax2.plot(n, P_pos, '-o', color='blue')
+        ax2.plot(n, P_curve, '-o', color=UPS_BLUE)
+        ax2.axvline(n_eval, color='k', ls='--')
+        ax2.axhline(P_puntual, color='k', ls='--')
         ax2.set_xlabel("Semanas n")
         ax2.set_ylabel("Probabilidad acumulada")
         ax2.set_title("Probabilidad de detectar al menos un positivo")
@@ -147,21 +172,30 @@ with tabs[2]:
         st.pyplot(fig2)
 
         st.latex(r"T = \frac{1}{p}")
+        st.caption("Periodo medio entre positivos consecutivos (frecuencia esperada).")
         st.latex(r"P(N \geq 1) = 1 - (1 - p)^n")
-        st.markdown(f"**Periodo de retorno esperado:** <span style='color:blue; font-weight:bold;'>{T:.1f} semanas</span>", unsafe_allow_html=True)
-        st.markdown("**Interpretación:** En control microbiológico, el periodo de retorno refleja la frecuencia esperada de detección de antibióticos. Un valor bajo alerta sobre recurrencia de contaminación.")
+        st.caption("Probabilidad de detectar al menos un caso positivo en n semanas.")
+
+        st.markdown(f"""
+        <div style='background:{UPS_BG};border-left:4px solid {UPS_BLUE};padding:10px;border-radius:6px;'>
+        <b>Resultados:</b><br>
+        • <b>Periodo de retorno esperado T:</b> <span style='color:{UPS_BLUE};font-weight:700'>{T:.1f} semanas</span><br>
+        • <b>Probabilidad de al menos un positivo en n={n_eval} semanas:</b> <span style='color:#2E7D32;font-weight:700'>{P_puntual:.1%}</span><br>
+        <i>Interpretación láctea:</i> T indica cada cuántas semanas, en promedio, aparece un positivo por antibióticos. Valores bajos advierten sobre recurrencia de contaminación.
+        </div>
+        """, unsafe_allow_html=True)
 
 # =========================================================
 # 4️⃣ INCERTIDUMBRE EN LA PROPORCIÓN (WILSON 95%)
 # =========================================================
 with tabs[3]:
     st.subheader("Incertidumbre en la proporción de positivos — Intervalo de Wilson 95%")
+    st.markdown(f"<h5 style='color:{UPS_GOLD};'>Evaluación de la precisión estadística de la proporción y del periodo de retorno</h5>", unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1.2, 2.2, 1.0])
-
+    col1, col2 = st.columns([1.2, 2.2])
     with col1:
-        x = st.number_input("Número de positivos (x)", 0, 1000, 9)
-        n_muestras = st.number_input("Número total de muestras (n)", 1, 10000, 300)
+        x = st.number_input("Número de positivos (x)", 0, 100000, 9, help="Número total de muestras con resultados positivos.")
+        n_muestras = st.number_input("Número total de muestras (n)", 1, 1000000, 300, help="Tamaño total de la muestra analizada.")
 
     with col2:
         z = 1.96
@@ -172,10 +206,13 @@ with tabs[3]:
         IC_inf = (num - term) / den
         IC_sup = (num + term) / den
 
-        p_vals = np.linspace(IC_inf, IC_sup, 200)
+        T_inf = 1 / IC_sup
+        T_sup = 1 / IC_inf
+
+        p_vals = np.linspace(max(IC_inf,1e-6), IC_sup, 200)
         T_vals = 1 / p_vals
 
-        fig3, ax3 = plt.subplots(figsize=(7.5,4.5))
+        fig3, ax3 = plt.subplots(figsize=(7.8,4.8))
         ax3.plot(p_vals*100, T_vals, 'b-', lw=2)
         ax3.axvline(p_hat*100, color='k', ls='--')
         ax3.axvline(IC_inf*100, color='r', ls='--')
@@ -186,14 +223,25 @@ with tabs[3]:
         ax3.grid(True)
         st.pyplot(fig3)
 
-    with col3:
         st.latex(r"\hat{p} = \frac{x}{n}")
-        st.latex(r"IC = \frac{\hat{p} + \frac{z^2}{2n} \pm z\sqrt{\frac{\hat{p}(1-\hat{p})}{n} + \frac{z^2}{4n^2}}}{1 + \frac{z^2}{n}}")
-        st.markdown(f"**Resultado:** <span style='color:blue; font-weight:bold;'>p̂ = {p_hat:.3f}, IC₉₅% ≈ [{IC_inf:.3f}, {IC_sup:.3f}]</span>", unsafe_allow_html=True)
-        st.markdown("**Interpretación:** En el ámbito lácteo, este intervalo expresa la incertidumbre estadística de la proporción real de muestras contaminadas, útil para evaluar la eficacia de los controles de calidad.")
+        st.caption("Proporción puntual de positivos detectados.")
+        st.latex(r"IC_{95\%}(p) = \frac{\hat{p} + \frac{z^2}{2n} \pm z\,\sqrt{\frac{\hat{p}(1-\hat{p})}{n} + \frac{z^2}{4n^2}}}{1 + \frac{z^2}{n}}")
+        st.caption("Intervalo de confianza de Wilson (95%) para la proporción real de positivos.")
+        st.latex(r"IC_{95\%}(T=1/p) = \left[\;\frac{1}{p_{\text{sup}}}\;,\; \frac{1}{p_{\text{inf}}}\;\right]")
+        st.caption("Intervalo de confianza transformado al dominio del periodo de retorno (T).")
 
-# Pie de página institucional
-st.markdown("---")
-st.markdown("<p style='text-align:center; color:#002F6C;'><b>M.Sc. Edwin Villarreal, Fís. — Universidad Politécnica Salesiana (UPS)</b></p>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style='background:{UPS_BG};border-left:4px solid #880E4F;padding:10px;border-radius:6px;'>
+        <b>Resultados:</b><br>
+        • <b>p̂:</b> <span style='font-weight:700'>{p_hat:.3f}</span><br>
+        • <b>IC₉₅%(p):</b> <span style='font-weight:700'>[{IC_inf:.3f}, {IC_sup:.3f}]</span><br>
+        • <b>IC₉₅%(T = 1/p):</b> <span style='font-weight:700'>[{T_inf:.1f}, {T_sup:.1f}] semanas</span><br>
+        <i>Interpretación láctea:</i> El intervalo de T muestra el rango probable de semanas entre positivos; útil para definir frecuencia de monitoreo y control de calidad.
+        </div>
+        """, unsafe_allow_html=True)
 
-
+# ------------------------------------------------------
+# PIE DE PÁGINA INSTITUCIONAL
+# ------------------------------------------------------
+st.markdown("<hr>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align:center; color:{UPS_BLUE};'><b>M.Sc. Edwin Villarreal, Fís. — Universidad Politécnica Salesiana (UPS)</b></p>", unsafe_allow_html=True)
