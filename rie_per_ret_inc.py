@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.special import gamma
 from math import exp, sqrt
+from scipy.stats import norm
 
 # ------------------------------------------------------
 # CONFIGURACIÓN GENERAL
@@ -45,13 +46,13 @@ with tabs[0]:
         st.markdown("---")
         col1, col2 = st.columns(2)
         with col1:
-            beta1 = st.slider("β₁ (Tempranas, β<1)", 0.20, 0.99, 0.90, help="Controla la tasa de fallas iniciales. Valores menores a 1 implican defectos de fabricación o instalación.")
-            beta3 = st.slider("β₂ (Desgaste, β>1)", 1.01, 3.00, 1.50, help="Representa fallas progresivas por envejecimiento de componentes o fricción.")
-            beta2 = st.slider("β₃ (Aleatorias, ≈1)", 0.90, 1.10, 1.00, help="Modela fallos aleatorios, asociados a eventos no predecibles.")
+            beta1 = st.slider("β₁ (Tempranas, β<1)", 0.20, 0.99, 0.90, help="Fallas iniciales por defectos de fabricación/instalación.")
+            beta3 = st.slider("β₂ (Desgaste, β>1)", 1.01, 3.00, 1.50, help="Fallas progresivas por envejecimiento/fricción.")
+            beta2 = st.slider("β₃ (Aleatorias, ≈1)", 0.90, 1.10, 1.00, help="Fallas no predecibles (choques aleatorios).")
         with col2:
-            eta1 = st.slider("η₁ (Tempranas, días)", 5, 50, 20, help="Vida característica del equipo con fallas tempranas.")
-            eta2 = st.slider("η₂ (Desgaste, días)", 5, 50, 25, help="Tiempo medio de vida útil antes del desgaste significativo.")
-            eta3 = st.slider("η₃ (Aleatorias, días)", 5, 50, 12, help="Tiempo medio de vida bajo condiciones aleatorias.")
+            eta1 = st.slider("η₁ (Tempranas, días)", 5, 50, 20, help="Vida característica en el escenario de fallas tempranas.")
+            eta2 = st.slider("η₂ (Desgaste, días)", 5, 50, 25, help="Vida característica cuando domina el desgaste.")
+            eta3 = st.slider("η₃ (Aleatorias, días)", 5, 50, 12, help="Vida característica bajo fallas aleatorias.")
         t_max = st.slider("Tiempo máximo (días)", 10, 120, 40)
 
     with col_plot:
@@ -60,8 +61,9 @@ with tabs[0]:
 
         t = np.linspace(0, t_max, 400)
         fig, ax = plt.subplots(figsize=(6,4))
+        # OJO: orden corregido para que coincida con sliders y etiquetas
         for beta, eta, label, color in zip(
-            [beta1, beta2, beta3],
+            [beta1, beta3, beta2],  # Tempranas, Desgaste, Aleatorias
             [eta1, eta2, eta3],
             ["Tempranas (β<1)", "Desgaste (β>1)", "Aleatorias (β≈1)"],
             [UPS_RED, UPS_BLUE, UPS_GOLD]):
@@ -74,12 +76,13 @@ with tabs[0]:
         st.pyplot(fig)
 
         st.latex(r"R(t) = e^{-(t/\eta)^{\beta}}")
-        st.caption("Donde R(t) representa la probabilidad de que el equipo continúe operativo tras t días; η es la vida característica y β define el tipo de fallo.")
+        st.caption("R(t): prob. de que el equipo continúe operativo tras t días; η: vida característica; β: tipo de fallo.")
 
+        # Tabla resumen de parámetros (RESTABLECIDA)
         st.markdown("### Resumen de parámetros ingresados")
         st.table({
             'Tipo de falla': ['Tempranas', 'Desgaste', 'Aleatorias'],
-            'β (forma)': [beta1, beta2, beta3],
+            'β (forma)': [beta1, beta3, beta2],
             'η (escala, días)': [eta1, eta2, eta3]
         })
 
@@ -125,20 +128,22 @@ with tabs[1]:
         ax.grid(True)
         st.pyplot(fig)
 
+        # Fórmulas + significado
         st.latex(r"P(T \leq t) = 1 - e^{-(t/\eta)^{\beta}}")
         st.caption("Probabilidad acumulada de fallo antes del tiempo t.")
         st.latex(r"E[T] = \eta \, \Gamma\!\left(1 + \frac{1}{\beta}\right)")
         st.caption("MTBF: tiempo medio esperado hasta el fallo.")
         st.latex(r"\text{Riesgo esperado} = Costo \times P(T \leq t)")
-        st.caption("Valor económico esperado asociado al fallo dentro del intervalo analizado.")
+        st.caption("Valor económico esperado del evento de fallo en el intervalo analizado.")
 
+        # Conclusiones profesionales
         st.markdown(f"""
         <div style='background:{UPS_BG};border-left:4px solid {UPS_BLUE};padding:10px;border-radius:6px;'>
         <b>Conclusiones:</b><br>
         • <b>Probabilidad de fallo antes de t:</b> <span style='color:{UPS_RED};font-weight:700'>{P_fail:.3f}</span><br>
         • <b>MTBF (tiempo medio hasta el fallo):</b> <span style='color:{UPS_BLUE};font-weight:700'>{MTBF:.2f} días</span><br>
         • <b>Riesgo económico esperado:</b> <span style='color:#F57C00;font-weight:700'>{riesgo:.0f} USD</span><br>
-        <i>Interpretación láctea:</i> El área roja cuantifica la fracción de bombas que fallarán antes de t días; útil para programar mantenimientos preventivos.
+        <i>Interpretación láctea:</i> El área roja cuantifica la fracción de bombas que fallarán antes de t días; usar para programar mantenimientos y evitar paros en CIP.
         </div>
         """, unsafe_allow_html=True)
 
@@ -171,34 +176,39 @@ with tabs[2]:
         ax2.grid(True)
         st.pyplot(fig2)
 
+        # Fórmulas y significado
         st.latex(r"T = \frac{1}{p}")
         st.caption("Periodo medio entre positivos consecutivos (frecuencia esperada).")
         st.latex(r"P(N \geq 1) = 1 - (1 - p)^n")
-        st.caption("Probabilidad de detectar al menos un caso positivo en n semanas.")
+        st.caption("Probabilidad de observar ≥1 positivo en n semanas.")
 
+        # Resultados y conclusión
         st.markdown(f"""
         <div style='background:{UPS_BG};border-left:4px solid {UPS_BLUE};padding:10px;border-radius:6px;'>
         <b>Resultados:</b><br>
         • <b>Periodo de retorno esperado T:</b> <span style='color:{UPS_BLUE};font-weight:700'>{T:.1f} semanas</span><br>
         • <b>Probabilidad de al menos un positivo en n={n_eval} semanas:</b> <span style='color:#2E7D32;font-weight:700'>{P_puntual:.1%}</span><br>
-        <i>Interpretación láctea:</i> T indica cada cuántas semanas, en promedio, aparece un positivo por antibióticos. Valores bajos advierten sobre recurrencia de contaminación.
+        <i>Interpretación láctea:</i> T indica cada cuántas semanas, en promedio, aparece un positivo por antibióticos. Valores bajos advierten recurrencia y necesidad de acciones correctivas.
         </div>
         """, unsafe_allow_html=True)
 
 # =========================================================
-# 4️⃣ INCERTIDUMBRE EN LA PROPORCIÓN (WILSON 95%)
+# 4️⃣ INCERTIDUMBRE EN LA PROPORCIÓN (WILSON con nivel seleccionable)
 # =========================================================
 with tabs[3]:
-    st.subheader("Incertidumbre en la proporción de positivos — Intervalo de Wilson 95%")
+    st.subheader("Incertidumbre en la proporción de positivos — Intervalo de Wilson")
     st.markdown(f"<h5 style='color:{UPS_GOLD};'>Evaluación de la precisión estadística de la proporción y del periodo de retorno</h5>", unsafe_allow_html=True)
 
     col1, col2 = st.columns([1.2, 2.2])
     with col1:
-        x = st.number_input("Número de positivos (x)", 0, 100000, 9, help="Número total de muestras con resultados positivos.")
-        n_muestras = st.number_input("Número total de muestras (n)", 1, 1000000, 300, help="Tamaño total de la muestra analizada.")
+        x = st.number_input("Número de positivos (x)", 0, 100000, 9, help="Conteo de muestras con resultado positivo.")
+        n_muestras = st.number_input("Número total de muestras (n)", 1, 1000000, 300, help="Tamaño total muestreado.")
+        nivel = st.selectbox("Nivel de confianza", options=[80, 90, 95, 98, 99], index=2,
+                             help="Selecciona el nivel de confianza (1−α).")
+        alpha = 1 - nivel/100
+        z = norm.ppf(1 - alpha/2)
 
     with col2:
-        z = 1.96
         p_hat = x / n_muestras
         num = p_hat + z**2/(2*n_muestras)
         den = 1 + z**2/n_muestras
@@ -206,10 +216,16 @@ with tabs[3]:
         IC_inf = (num - term) / den
         IC_sup = (num + term) / den
 
-        T_inf = 1 / IC_sup
-        T_sup = 1 / IC_inf
+        # Robustez de bordes
+        eps = 1e-9
+        IC_inf = max(0.0, IC_inf)
+        IC_sup = min(1.0, IC_sup)
 
-        p_vals = np.linspace(max(IC_inf,1e-6), IC_sup, 200)
+        # IC para periodo de retorno T=1/p (monótona decreciente)
+        T_inf = 1 / IC_sup if IC_sup > eps else float("inf")
+        T_sup = 1 / IC_inf if IC_inf > eps else float("inf")
+
+        p_vals = np.linspace(max(IC_inf, eps), max(IC_sup, eps*10), 200)
         T_vals = 1 / p_vals
 
         fig3, ax3 = plt.subplots(figsize=(7.8,4.8))
@@ -223,20 +239,21 @@ with tabs[3]:
         ax3.grid(True)
         st.pyplot(fig3)
 
+        # Construcción del IC (debajo de la gráfica)
         st.latex(r"\hat{p} = \frac{x}{n}")
-        st.caption("Proporción puntual de positivos detectados.")
-        st.latex(r"IC_{95\%}(p) = \frac{\hat{p} + \frac{z^2}{2n} \pm z\,\sqrt{\frac{\hat{p}(1-\hat{p})}{n} + \frac{z^2}{4n^2}}}{1 + \frac{z^2}{n}}")
-        st.caption("Intervalo de confianza de Wilson (95%) para la proporción real de positivos.")
-        st.latex(r"IC_{95\%}(T=1/p) = \left[\;\frac{1}{p_{\text{sup}}}\;,\; \frac{1}{p_{\text{inf}}}\;\right]")
-        st.caption("Intervalo de confianza transformado al dominio del periodo de retorno (T).")
+        st.caption("Proporción puntual de positivos.")
+        st.latex(r"IC_{(1-\alpha)}(p) = \frac{\hat{p} + \frac{z^2}{2n} \pm z\,\sqrt{\frac{\hat{p}(1-\hat{p})}{n} + \frac{z^2}{4n^2}}}{1 + \frac{z^2}{n}}")
+        st.caption("Intervalo de confianza de Wilson para la proporción real a nivel (1−α).")
+        st.latex(r"IC_{(1-\alpha)}(T=1/p) = \left[\frac{1}{p_{sup}},\frac{1}{p_{inf}}\right]")
+        st.caption("Transformación monótona al dominio del periodo de retorno T.")
 
         st.markdown(f"""
         <div style='background:{UPS_BG};border-left:4px solid #880E4F;padding:10px;border-radius:6px;'>
-        <b>Resultados:</b><br>
-        • <b>p̂:</b> <span style='font-weight:700'>{p_hat:.3f}</span><br>
-        • <b>IC₉₅%(p):</b> <span style='font-weight:700'>[{IC_inf:.3f}, {IC_sup:.3f}]</span><br>
-        • <b>IC₉₅%(T = 1/p):</b> <span style='font-weight:700'>[{T_inf:.1f}, {T_sup:.1f}] semanas</span><br>
-        <i>Interpretación láctea:</i> El intervalo de T muestra el rango probable de semanas entre positivos; útil para definir frecuencia de monitoreo y control de calidad.
+        <b>Resultados ({nivel}%):</b><br>
+        • <b>p̂:</b> {p_hat:.4f}<br>
+        • <b>IC(p):</b> [{IC_inf:.4f}, {IC_sup:.4f}]<br>
+        • <b>IC(T=1/p):</b> [{T_inf:.1f}, {T_sup:.1f}] semanas<br>
+        <i>Interpretación láctea:</i> El intervalo de T muestra el rango probable de semanas entre positivos; útil para definir la periodicidad de monitoreo y control de proveedores.
         </div>
         """, unsafe_allow_html=True)
 
