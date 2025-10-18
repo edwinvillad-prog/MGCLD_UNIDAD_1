@@ -664,7 +664,19 @@ with tabs[2]:
         hist = np.histogram(x, bins=20, density=True)
         fig = go.Figure()
         fig.add_bar(x=hist[1][:-1], y=hist[0], name="Datos", opacity=0.6)
-        xs = np.linspace(min(x), max(x), 200)
+        # --- Generación segura de rango para gráficos ---
+        if len(x) == 0 or np.isnan(x).all():
+            st.error("❌ No hay datos válidos para graficar la distribución.")
+            st.stop()
+
+        x_min, x_max = np.nanmin(x), np.nanmax(x)
+        if x_min == x_max:
+            st.warning("⚠️ Todos los valores de la variable son iguales. "
+                    "No se puede generar el gráfico de densidad.")
+            st.stop()
+
+        xs = np.linspace(x_min, x_max, 200)
+
         if dist_choice == "Normal":
             ys = norm.pdf(xs, mu, sigma)
         elif dist_choice == "Exponencial":
@@ -1126,7 +1138,9 @@ with tabs[5]:
                     "establecer límites de seguridad en logística.")
 
 
+
                     
+
 
 
 
