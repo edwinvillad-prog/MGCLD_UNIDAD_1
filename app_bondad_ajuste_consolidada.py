@@ -700,7 +700,7 @@ with tabs[3]:
 
     # --- Comprobación explícita del DataFrame ---
     try:
-        st.write("📂 Diagnóstico: tipo de 'data' =", type(data))
+        st.markdown(f"📂 **Diagnóstico: tipo de `data` =** `{type(data).__name__}`")
     except NameError:
         st.error("❌ La variable 'data' no existe en este contexto. Mueve el bloque de carga fuera de las pestañas.")
         st.stop()
@@ -1165,4 +1165,5 @@ with tabs[5]:
                     "Comparar ambas curvas ayuda a decidir políticas de control: "
                     "reforzar refrigeración, ajustar tiempos de distribución o "
                     "establecer límites de seguridad en logística.")
+
 
