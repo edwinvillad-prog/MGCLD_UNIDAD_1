@@ -186,7 +186,16 @@ with tabs[1]:
 
     if data is not None:
        
-        variable = st.selectbox("Seleccione variable discreta", data.columns, key="var_disc")
+        # --- 🔧 Mostrar solo columnas numéricas ---
+        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+        if not numeric_cols:
+            st.error("❌ No hay columnas numéricas en el archivo. "
+                    "Revise que el archivo tenga datos numéricos (sin texto).")
+            st.stop()
+
+        variable = st.selectbox("Seleccione variable discreta", numeric_cols, key="var_disc")
+
+
         dist_choice = st.radio("Distribución de referencia", ["Poisson", "Binomial", "Hipergeométrica"], key="dist_disc")
 
         x = data[variable].dropna().values
@@ -385,7 +394,15 @@ with tabs[2]:
             f"📌 Modo de decisión: **{decision_mode_cont}**")
 
     if data is not None:
-        variable = st.selectbox("Seleccione variable continua", data.columns, key="var_cont")
+        # --- 🔧 Mostrar solo columnas numéricas ---
+        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+        if not numeric_cols:
+            st.error("❌ No hay columnas numéricas en el archivo. "
+                    "Revise que el archivo tenga datos numéricos (sin texto).")
+            st.stop()
+
+        variable = st.selectbox("Seleccione variable continua", numeric_cols, key="var_cont")
+
         dist_choice = st.radio("Distribución de referencia", ["Normal", "Exponencial", "Weibull", "Gamma", "Lognormal"], key="dist_cont")
 
         x = data[variable].dropna().values
@@ -664,7 +681,15 @@ with tabs[3]:
 
     if data is not None:
         # Selección de variable y distribución
-        variable = st.selectbox("Seleccione variable discreta", data.columns, key="val_disc_var")
+        # --- 🔧 Mostrar solo columnas numéricas ---
+        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+        if not numeric_cols:
+            st.error("❌ No hay columnas numéricas en el archivo. "
+                    "Verifique que las columnas contengan datos numéricos (conteos o frecuencias).")
+            st.stop()
+
+        variable = st.selectbox("Seleccione variable discreta", numeric_cols, key="val_disc_var")
+
         dist_choice = st.radio("Modelo discreto a validar",
                                ["Poisson", "Binomial", "Hipergeométrica"],
                                key="val_disc_dist")
@@ -1084,4 +1109,6 @@ with tabs[5]:
                     "Comparar ambas curvas ayuda a decidir políticas de control: "
                     "reforzar refrigeración, ajustar tiempos de distribución o "
                     "establecer límites de seguridad en logística.")
+                    
+
 
