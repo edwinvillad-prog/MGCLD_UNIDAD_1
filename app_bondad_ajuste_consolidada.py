@@ -717,32 +717,36 @@ with tabs[3]:
 
         variable = st.selectbox("Seleccione variable discreta", numeric_cols, key="val_disc_var")
         # --- 🔍 Detección automática de variable tipo Likert (1–10) ---
-        x = data[variable].dropna().values
+        x = data[variable].dropna()
 
-        if np.issubdtype(x.dtype, np.number) and len(np.unique(x)) <= 10:
+        # Intentar convertir a numérico (por si vienen como texto)
+        x = pd.to_numeric(x, errors="coerce").dropna().astype(float).values
+
+        if len(np.unique(x)) <= 10 and np.all((x >= 1) & (x <= 10)):
             st.subheader("📊 Bondad de ajuste uniforme (escala discreta tipo Likert)")
             obs_counts = pd.Series(x).value_counts().sort_index()
             k = len(obs_counts)
             exp_counts = np.ones(k) * len(x) / k  # esperados iguales
 
             chi2, pval = chisquare(obs_counts, f_exp=exp_counts)
-            st.write(f"Estadístico = {chi2:.3f}, p-valor = {pval:.4f}")
+            st.write(f"**Estadístico = {chi2:.3f}**, **p-valor = {pval:.4f}**")
 
             if pval < alpha:
-                st.error("❌ Rechazar H₀: las respuestas no son uniformes.")
+                st.error("❌ Rechazar H₀: las respuestas **no** son uniformes.")
             else:
                 st.success("✅ No rechazar H₀: las respuestas parecen uniformes entre categorías.")
 
             # Gráfico Observado vs Esperado
             fig = go.Figure()
-            fig.add_bar(x=obs_counts.index, y=obs_counts.values, name="Observados")
+            fig.add_bar(x=obs_counts.index, y=obs_counts.values, name="Observados", marker_color="#003366")
             fig.add_scatter(x=obs_counts.index, y=exp_counts, mode="lines+markers",
-                            name="Esperados (Uniforme)", line=dict(color="red"))
+                            name="Esperados (Uniforme)", line=dict(color="#F7B500"))
             fig.update_layout(title=f"Distribución uniforme — {variable}",
-                            xaxis_title="Categorías", yaxis_title="Frecuencia")
+                            xaxis_title="Categorías", yaxis_title="Frecuencia",
+                            template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
-            # Detener aquí si es variable Likert (no aplicar Poisson/Binomial)
+            # Detener aquí si es variable Likert
             st.stop()
 
         dist_choice = st.radio("Modelo discreto a validar",
@@ -1169,7 +1173,10 @@ with tabs[5]:
 
 
 
+
+
                     
+
 
 
 
