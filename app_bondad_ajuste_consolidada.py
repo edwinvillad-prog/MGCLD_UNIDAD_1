@@ -37,17 +37,40 @@ st.sidebar.markdown("👤 **M.Sc. Edwin Villarreal, Fís.** ")
 
 alpha = st.sidebar.selectbox("Nivel de significancia (α)", [0.01, 0.05, 0.10], index=1)
 
+# =========================
+# CARGA DE ARCHIVO (robusta)
+# =========================
 st.sidebar.markdown("### 📂 Cargar archivo")
 uploaded_file = st.sidebar.file_uploader("Subir archivo CSV/Excel", type=["csv", "xlsx"])
 data = None
+
 if uploaded_file:
-    if uploaded_file.name.endswith(".csv"):
-        data = pd.read_csv(uploaded_file)
-    else:
-        data = pd.read_excel(uploaded_file)
-    st.sidebar.success(f"Archivo cargado: {uploaded_file.name}")
+    try:
+        # --- Lectura automática según extensión ---
+        if uploaded_file.name.endswith(".csv"):
+            data = pd.read_csv(uploaded_file)
+        else:
+            data = pd.read_excel(uploaded_file)
+
+        # --- 🔧 Limpieza de encabezados ---
+        data.columns = data.columns.map(lambda c: str(c).strip())
+
+        # --- Mostrar confirmación y vista previa ---
+        st.sidebar.success(f"✅ Archivo cargado correctamente: {uploaded_file.name}")
+        st.sidebar.write("**Columnas detectadas:**")
+        st.sidebar.dataframe(data.head(3))
+
+        # --- Verificación rápida de tipo de dato ---
+        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+        if not numeric_cols:
+            st.sidebar.warning("⚠️ No se detectaron columnas numéricas. "
+                               "Revise el formato o los encabezados de su archivo.")
+
+    except Exception as e:
+        st.sidebar.error(f"❌ Error al leer el archivo: {e}")
 else:
-    st.sidebar.info("⚠️ Cargue un archivo para iniciar análisis.")
+    st.sidebar.info("⚠️ Cargue un archivo CSV o Excel con encabezados en la primera fila.")
+
 
 decision_mode_disc = st.sidebar.radio(
     "Modo de decisión (discretas)", 
@@ -166,7 +189,17 @@ with tabs[1]:
         variable = st.selectbox("Seleccione variable discreta", data.columns, key="var_disc")
         dist_choice = st.radio("Distribución de referencia", ["Poisson", "Binomial", "Hipergeométrica"], key="dist_disc")
 
-        x = data[variable].dropna().astype(int).values
+        x = data[variable].dropna().values
+        # --- 🔧 Validación de discreción ---
+        if np.any(x % 1 != 0):
+            st.warning("⚠️ La variable seleccionada tiene valores decimales. "
+                    "Se redondearán al entero más cercano para aplicar la prueba discreta.")
+            x = np.round(x).astype(int)
+        else:
+            x = x.astype(int)
+
+        x = np.clip(x, 0, None)  # Evita valores negativos
+
         obs_counts = np.bincount(x)
         n = len(x)
 
@@ -637,7 +670,17 @@ with tabs[3]:
                                key="val_disc_dist")
 
         # Vector de observaciones discretas
-        x = data[variable].dropna().astype(int).values
+        x = data[variable].dropna().values
+        # --- 🔧 Validación de discreción ---
+        if np.any(x % 1 != 0):
+            st.warning("⚠️ La variable seleccionada tiene valores decimales. "
+                    "Se redondearán al entero más cercano para aplicar el modelo discreto.")
+            x = np.round(x).astype(int)
+        else:
+            x = x.astype(int)
+
+        x = np.clip(x, 0, None)
+
         n = len(x)
 
         # Conteos observados por categoría (0,1,2,...,k)
@@ -925,9 +968,24 @@ with tabs[5]:
         # =========================
         if escenario == "Contaminación microbiológica":
             lam = np.mean(x)
-            exp_counts = [poisson.pmf(k, lam) * n for k in range(max(x)+1)]
-            exp_counts = np.array(exp_counts) * n / np.sum(exp_counts)
+
+            # --- 🔧 Corrección: validar si los datos son enteros ---
+            if np.any(x % 1 != 0):
+                st.warning("⚠️ La variable seleccionada tiene valores decimales. "
+                        "Se redondearán al entero más cercano para aplicar el modelo de Poisson.")
+                x = np.round(x).astype(int)
+            else:
+                x = x.astype(int)
+
+            # Evitar valores negativos (Poisson no los permite)
+            x = np.clip(x, 0, None)
+
+            # --- Cálculo corregido de esperados ---
+            exp_counts = [poisson.pmf(k, lam) * len(x) for k in range(int(max(x)) + 1)]
+            exp_counts = np.array(exp_counts)
+            exp_counts *= len(x) / exp_counts.sum()
             obs_counts = np.bincount(x, minlength=len(exp_counts))
+
 
             chi2, pval = chisquare(obs_counts, f_exp=exp_counts)
 
