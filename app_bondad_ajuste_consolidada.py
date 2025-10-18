@@ -697,6 +697,7 @@ with tabs[2]:
 # =========================
 with tabs[3]:
     st.header("🧮 Validación avanzada de modelos discretos")
+    st.markdown("<hr style='border:2px solid #002F6C;'>", unsafe_allow_html=True)
 
     # --- Comprobación explícita del DataFrame ---
     try:
@@ -705,6 +706,7 @@ with tabs[3]:
         st.error("❌ La variable 'data' no existe en este contexto. Mueve el bloque de carga fuera de las pestañas.")
         st.stop()
 
+    # --- Validación de existencia de datos ---
     if data is None:
         st.warning("⚠️ No hay datos cargados. Sube un archivo en la barra lateral.")
     elif data.empty:
@@ -713,210 +715,207 @@ with tabs[3]:
         st.success(f"✅ Archivo cargado con {len(data)} registros y {len(data.columns)} columnas.")
         st.write("Columnas detectadas:", list(data.columns))
 
+        # --- Banner de contexto ---
+        st.info(f"🔎 Nivel de significancia actual: **α = {alpha}**\n\n📌 Modo de decisión: **{decision_mode_disc}**")
 
-    # --- Banner de contexto ---
-    st.info(f"🔎 Nivel de significancia actual: **α = {alpha}**\n\n📌 Modo de decisión: **{decision_mode_disc}**")
-
-    # --- Selección de variable ---
-    numeric_cols = data.select_dtypes(include=[np.number, "object"]).columns.tolist()
-    if not numeric_cols:
-        st.error("❌ No se detectaron columnas numéricas o convertibles.")
-        st.stop()
-
-    variable = st.selectbox("Seleccione variable discreta", numeric_cols, key="val_disc_var")
-
-    # --- Conversión robusta a numérico ---
-    x = pd.to_numeric(data[variable], errors="coerce").dropna().astype(float).values
-    st.write("🧪 Valores únicos detectados:", np.unique(x))
-
-    # --- Detección Likert ---
-    unique_vals = np.unique(x)
-    if len(unique_vals) <= 10 and np.nanmin(unique_vals) >= 1 and np.nanmax(unique_vals) <= 10:
-        st.subheader("📊 Bondad de ajuste uniforme (escala discreta tipo Likert)")
-        obs_counts = pd.Series(x).value_counts().sort_index()
-        k = len(obs_counts)
-        exp_counts = np.ones(k) * len(x) / k
-        chi2, pval = chisquare(obs_counts, f_exp=exp_counts)
-
-        st.write(f"**Estadístico = {chi2:.3f}**, **p-valor = {pval:.4f}**")
-        if pval < alpha:
-            st.error("❌ Rechazar H₀: las respuestas **no** son uniformes.")
+        # --- Selección de variable ---
+        numeric_cols = data.select_dtypes(include=[np.number, "object"]).columns.tolist()
+        if not numeric_cols:
+            st.error("❌ No se detectaron columnas numéricas o convertibles.")
         else:
-            st.success("✅ No rechazar H₀: las respuestas parecen uniformes entre categorías.")
+            variable = st.selectbox("Seleccione variable discreta", numeric_cols, key="val_disc_var")
 
-        fig = go.Figure()
-        fig.add_bar(x=obs_counts.index, y=obs_counts.values, name="Observados", marker_color="#003366")
-        fig.add_scatter(x=obs_counts.index, y=exp_counts, mode="lines+markers",
-                        name="Esperados (Uniforme)", line=dict(color="#F7B500"))
-        fig.update_layout(title=f"Distribución uniforme — {variable}",
-                          xaxis_title="Categorías", yaxis_title="Frecuencia",
-                          template="plotly_white")
-        st.plotly_chart(fig, use_container_width=True)
+            # --- Conversión robusta a numérico ---
+            x = pd.to_numeric(data[variable], errors="coerce").dropna().astype(float).values
+            st.write("🧪 Valores únicos detectados:", np.unique(x))
 
-        st.caption("ℹ️ Variable Likert detectada. Fin de la validación discreta.")
-        st.stop()
+            # --- Detección Likert ---
+            unique_vals = np.unique(x)
+            if len(unique_vals) <= 10 and np.nanmin(unique_vals) >= 1 and np.nanmax(unique_vals) <= 10:
+                st.subheader("📊 Bondad de ajuste uniforme (escala discreta tipo Likert)")
+                obs_counts = pd.Series(x).value_counts().sort_index()
+                k = len(obs_counts)
+                exp_counts = np.ones(k) * len(x) / k
+                chi2, pval = chisquare(obs_counts, f_exp=exp_counts)
 
-    # --- Si no es Likert, continuar normalmente ---
-    st.markdown("✅ Variable no es Likert: continuar con modelos Poisson, Binomial e Hipergeométrica.")
+                st.write(f"**Estadístico = {chi2:.3f}**, **p-valor = {pval:.4f}**")
+                if pval < alpha:
+                    st.error("❌ Rechazar H₀: las respuestas **no** son uniformes.")
+                else:
+                    st.success("✅ No rechazar H₀: las respuestas parecen uniformes entre categorías.")
 
-    dist_choice = st.radio("Modelo discreto a validar",
-                           ["Poisson", "Binomial", "Hipergeométrica"],
-                           key="val_disc_dist")
+                fig = go.Figure()
+                fig.add_bar(x=obs_counts.index, y=obs_counts.values, name="Observados", marker_color="#003366")
+                fig.add_scatter(x=obs_counts.index, y=exp_counts, mode="lines+markers",
+                                name="Esperados (Uniforme)", line=dict(color="#F7B500"))
+                fig.update_layout(title=f"Distribución uniforme — {variable}",
+                                  xaxis_title="Categorías", yaxis_title="Frecuencia",
+                                  template="plotly_white")
+                st.plotly_chart(fig, use_container_width=True)
 
+                st.caption("ℹ️ Variable Likert detectada. Fin de la validación discreta.")
 
-    # Vector de observaciones discretas
-    x = data[variable].dropna().values
+            else:
+                # --- Si no es Likert, continuar normalmente ---
+                st.markdown("✅ Variable no es Likert: continuar con modelos Poisson, Binomial e Hipergeométrica.")
 
-    # --- 🔧 Validación de discreción ---
-    if np.any(x % 1 != 0):
-        st.warning("⚠️ La variable seleccionada tiene valores decimales. "
-                   "Se redondearán al entero más cercano para aplicar el modelo discreto.")
-        x = np.round(x).astype(int)
-    else:
-        x = x.astype(int)
+                dist_choice = st.radio("Modelo discreto a validar",
+                                       ["Poisson", "Binomial", "Hipergeométrica"],
+                                       key="val_disc_dist")
 
-    x = np.clip(x, 0, None)  # evita negativos
-    n = len(x)
+                # Vector de observaciones discretas
+                x = data[variable].dropna().values
 
-    # Conteos observados por categoría (0,1,2,...,k)
-    obs_counts = np.bincount(x)
-    k_vals = np.arange(len(obs_counts))
+                # --- 🔧 Validación de discreción ---
+                if np.any(x % 1 != 0):
+                    st.warning("⚠️ La variable seleccionada tiene valores decimales. "
+                               "Se redondearán al entero más cercano para aplicar el modelo discreto.")
+                    x = np.round(x).astype(int)
+                else:
+                    x = x.astype(int)
 
-    # Advertencia por tamaño muestral
-    if n < 20:
-        st.warning("⚠️ Tamaño muestral pequeño (n < 20). "
-                   "Chi² puede ser inestable; use Monte Carlo o pruebas exactas cuando aplique.")
+                x = np.clip(x, 0, None)  # evita negativos
+                n = len(x)
 
-    # -------------------------------------------------
-    # 1) Parámetros, loglike y probabilidades teóricas
-    # -------------------------------------------------
-    if dist_choice == "Poisson":
-        lam = np.mean(x)
-        pmf = poisson.pmf(k_vals, lam)
-        loglike = np.sum(poisson.logpmf(x, lam))
-        param_text = f"λ̂ = {lam:.4f}"
-        k_params = 1
+                # Conteos observados por categoría (0,1,2,...,k)
+                obs_counts = np.bincount(x)
+                k_vals = np.arange(len(obs_counts))
 
-    elif dist_choice == "Binomial":
-        n_trials = st.number_input("Número de ensayos por observación (n)", 1, 1000, 10, key="val_disc_ntrials")
-        p = np.clip(np.mean(x) / n_trials, 1e-9, 1-1e-9)
-        pmf = binom.pmf(k_vals, n_trials, p)
-        loglike = np.sum(binom.logpmf(x, n_trials, p))
-        param_text = f"n = {int(n_trials)}, p̂ = {p:.4f}"
-        k_params = 1
+                # Advertencia por tamaño muestral
+                if n < 20:
+                    st.warning("⚠️ Tamaño muestral pequeño (n < 20). "
+                               "Chi² puede ser inestable; use Monte Carlo o pruebas exactas cuando aplique.")
 
-    else:  # Hipergeométrica
-        N = st.number_input("Tamaño población (N)", 1, 100000, 200, key="val_disc_N")
-        K = st.number_input("Éxitos en población (K)", 0, int(N), min(int(N)//4, int(N)), key="val_disc_K")
-        n_s = st.number_input("Tamaño de muestra por observación (n_s)", 1, int(N), min(10, int(N)), key="val_disc_ns")
-        pmf = hypergeom.pmf(k_vals, N, K, n_s)
-        with np.errstate(divide='ignore'):
-            loglike = np.sum(hypergeom.logpmf(x, N, K, n_s))
-        param_text = f"N={int(N)}, K={int(K)}, n_s={int(n_s)}"
-        k_params = 2
+                # -------------------------------------------------
+                # 1) Parámetros, loglike y probabilidades teóricas
+                # -------------------------------------------------
+                if dist_choice == "Poisson":
+                    lam = np.mean(x)
+                    pmf = poisson.pmf(k_vals, lam)
+                    loglike = np.sum(poisson.logpmf(x, lam))
+                    param_text = f"λ̂ = {lam:.4f}"
+                    k_params = 1
 
-    pmf = np.clip(pmf, 1e-15, 1.0)
-    pmf = pmf / pmf.sum()
+                elif dist_choice == "Binomial":
+                    n_trials = st.number_input("Número de ensayos por observación (n)", 1, 1000, 10, key="val_disc_ntrials")
+                    p = np.clip(np.mean(x) / n_trials, 1e-9, 1-1e-9)
+                    pmf = binom.pmf(k_vals, n_trials, p)
+                    loglike = np.sum(binom.logpmf(x, n_trials, p))
+                    param_text = f"n = {int(n_trials)}, p̂ = {p:.4f}"
+                    k_params = 1
 
-    # -------------------------------------------------
-    # 2) AIC/BIC
-    # -------------------------------------------------
-    aic = -2 * loglike + 2 * k_params
-    bic = -2 * loglike + k_params * np.log(n)
+                else:  # Hipergeométrica
+                    N = st.number_input("Tamaño población (N)", 1, 100000, 200, key="val_disc_N")
+                    K = st.number_input("Éxitos en población (K)", 0, int(N), min(int(N)//4, int(N)), key="val_disc_K")
+                    n_s = st.number_input("Tamaño de muestra por observación (n_s)", 1, int(N), min(10, int(N)), key="val_disc_ns")
+                    pmf = hypergeom.pmf(k_vals, N, K, n_s)
+                    with np.errstate(divide='ignore'):
+                        loglike = np.sum(hypergeom.logpmf(x, N, K, n_s))
+                    param_text = f"N={int(N)}, K={int(K)}, n_s={int(n_s)}"
+                    k_params = 2
 
-    st.subheader("📋 Log-verosimilitud y criterios de información")
-    st.table(pd.DataFrame({"Estadístico": ["Loglike", "AIC", "BIC", "Parámetros"],
-                           "Valor": [loglike, aic, bic, param_text]}))
+                pmf = np.clip(pmf, 1e-15, 1.0)
+                pmf = pmf / pmf.sum()
 
-    # -------------------------------------------------
-    # 3) Esperados, Chi² y Monte Carlo (si aplica)
-    # -------------------------------------------------
-    exp_counts = pmf * n
-    exp_counts *= n / exp_counts.sum()
+                # -------------------------------------------------
+                # 2) AIC/BIC
+                # -------------------------------------------------
+                aic = -2 * loglike + 2 * k_params
+                bic = -2 * loglike + k_params * np.log(n)
 
-    low_expected = int(np.sum(exp_counts < 5))
-    if low_expected > 0:
-        st.warning(f"⚠️ Se detectaron {low_expected} categorías con esperados < 5. "
-                   "El Chi² puede perder validez. Considere **reagrupar** o usar **Monte Carlo**.")
+                st.subheader("📋 Log-verosimilitud y criterios de información")
+                st.table(pd.DataFrame({"Estadístico": ["Loglike", "AIC", "BIC", "Parámetros"],
+                                       "Valor": [loglike, aic, bic, param_text]}))
 
-    chi2, pval = chisquare(obs_counts, f_exp=exp_counts)
+                # -------------------------------------------------
+                # 3) Esperados, Chi² y Monte Carlo (si aplica)
+                # -------------------------------------------------
+                exp_counts = pmf * n
+                exp_counts *= n / exp_counts.sum()
 
-    st.subheader("📈 Chi² clásico (referencia)")
-    st.write(f"Estadístico = {chi2:.3f}, p-valor = {pval:.4f}")
+                low_expected = int(np.sum(exp_counts < 5))
+                if low_expected > 0:
+                    st.warning(f"⚠️ Se detectaron {low_expected} categorías con esperados < 5. "
+                               "El Chi² puede perder validez. Considere **reagrupar** o usar **Monte Carlo**.")
 
-    # Monte Carlo
-    pval_mc = None
-    if (n < 20) or (low_expected > 0):
-        st.caption("🎲 Monte Carlo activado por n pequeño o esperados bajos.")
-        def chi2_montecarlo(obs, exp, n_sim=5000):
-            chi2_obs, _ = chisquare(obs, f_exp=exp)
-            probs = exp / np.sum(exp)
-            n_tot = int(np.sum(obs))
-            sims = np.empty(n_sim)
-            for i in range(n_sim):
-                sim_data = np.random.multinomial(n_tot, probs)
-                sims[i], _ = chisquare(sim_data, f_exp=exp)
-            return np.mean(sims >= chi2_obs)
-        pval_mc = chi2_montecarlo(obs_counts, exp_counts, n_sim=5000)
-        st.write(f"**Chi² Monte Carlo:** p-valor simulado = {pval_mc:.4f}")
+                chi2, pval = chisquare(obs_counts, f_exp=exp_counts)
 
-    # -------------------------------------------------
-    # 4) Residuos (Pearson y Deviance)
-    # -------------------------------------------------
-    st.subheader("📊 Residuos (diagnóstico)")
+                st.subheader("📈 Chi² clásico (referencia)")
+                st.write(f"Estadístico = {chi2:.3f}, p-valor = {pval:.4f}")
 
-    with np.errstate(divide='ignore', invalid='ignore'):
-        pearson_res = (obs_counts - exp_counts) / np.sqrt(np.where(exp_counts > 0, exp_counts, np.nan))
+                # Monte Carlo
+                pval_mc = None
+                if (n < 20) or (low_expected > 0):
+                    st.caption("🎲 Monte Carlo activado por n pequeño o esperados bajos.")
+                    def chi2_montecarlo(obs, exp, n_sim=5000):
+                        chi2_obs, _ = chisquare(obs, f_exp=exp)
+                        probs = exp / np.sum(exp)
+                        n_tot = int(np.sum(obs))
+                        sims = np.empty(n_sim)
+                        for i in range(n_sim):
+                            sim_data = np.random.multinomial(n_tot, probs)
+                            sims[i], _ = chisquare(sim_data, f_exp=exp)
+                        return np.mean(sims >= chi2_obs)
+                    pval_mc = chi2_montecarlo(obs_counts, exp_counts, n_sim=5000)
+                    st.write(f"**Chi² Monte Carlo:** p-valor simulado = {pval_mc:.4f}")
 
-    dev_terms = np.where(obs_counts > 0,
-                         2 * obs_counts * np.log(np.where(exp_counts > 0, obs_counts / exp_counts, np.nan)),
-                         0.0)
-    deviance = np.nansum(dev_terms)
-    st.write(f"Deviance total (aprox.): {deviance:.3f}")
+                # -------------------------------------------------
+                # 4) Residuos (Pearson y Deviance)
+                # -------------------------------------------------
+                st.subheader("📊 Residuos (diagnóstico)")
 
-    fig_oe = go.Figure()
-    fig_oe.add_bar(x=k_vals, y=obs_counts, name="Observados")
-    fig_oe.add_scatter(x=k_vals, y=exp_counts, mode="lines+markers", name="Esperados", line=dict(color="red"))
-    fig_oe.update_layout(title=f"Observado vs Esperado — {dist_choice}",
-                         xaxis_title="Clases", yaxis_title="Frecuencia")
-    st.plotly_chart(fig_oe, use_container_width=True)
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    pearson_res = (obs_counts - exp_counts) / np.sqrt(np.where(exp_counts > 0, exp_counts, np.nan))
 
-    fig_pr = go.Figure()
-    fig_pr.add_bar(x=k_vals, y=np.nan_to_num(pearson_res), name="Residuos de Pearson")
-    fig_pr.update_layout(title="Residuos de Pearson por clase",
-                         xaxis_title="Clases", yaxis_title="(O-E)/√E")
-    st.plotly_chart(fig_pr, use_container_width=True)
+                dev_terms = np.where(obs_counts > 0,
+                                     2 * obs_counts * np.log(np.where(exp_counts > 0, obs_counts / exp_counts, np.nan)),
+                                     0.0)
+                deviance = np.nansum(dev_terms)
+                st.write(f"Deviance total (aprox.): {deviance:.3f}")
 
-    # -------------------------------------------------
-    # 5) Dictamen final
-    # -------------------------------------------------
-    st.markdown("---")
-    st.subheader("🧾 Dictamen final")
+                fig_oe = go.Figure()
+                fig_oe.add_bar(x=k_vals, y=obs_counts, name="Observados")
+                fig_oe.add_scatter(x=k_vals, y=exp_counts, mode="lines+markers", name="Esperados", line=dict(color="red"))
+                fig_oe.update_layout(title=f"Observado vs Esperado — {dist_choice}",
+                                     xaxis_title="Clases", yaxis_title="Frecuencia")
+                st.plotly_chart(fig_oe, use_container_width=True)
 
-    chi2_reject = (pval < alpha)
-    mc_reject = (pval_mc is not None) and (pval_mc < alpha)
+                fig_pr = go.Figure()
+                fig_pr.add_bar(x=k_vals, y=np.nan_to_num(pearson_res), name="Residuos de Pearson")
+                fig_pr.update_layout(title="Residuos de Pearson por clase",
+                                     xaxis_title="Clases", yaxis_title="(O-E)/√E")
+                st.plotly_chart(fig_pr, use_container_width=True)
 
-    if decision_mode_disc.startswith("Estricto"):
-        if chi2_reject or mc_reject:
-            driver = "Monte Carlo" if mc_reject else "Chi² clásico"
-            st.error(f"**Dictamen final (estricto):** Rechazar H₀ (α={alpha}). "
-                     f"Decisión basada en **{driver}**.")
-        else:
-            base = "Monte Carlo" if pval_mc is not None else "Chi² clásico"
-            st.success(f"**Dictamen final (estricto):** No rechazar H₀ (α={alpha}). "
-                       f"Decisión basada en **{base}**.")
-    else:
-        if chi2_reject:
-            st.error(f"**Dictamen final (docente):** Rechazar H₀ (α={alpha}). "
-                     f"Según Chi² (p={pval:.4f}).")
-        else:
-            st.success(f"**Dictamen final (docente):** No rechazar H₀ (α={alpha}). "
-                       f"Según Chi² (p={pval:.4f}).")
-            if pval_mc is not None and (mc_reject != chi2_reject):
-                st.info("ℹ️ Nota: Monte Carlo llegó a una conclusión distinta; sensible a esperados bajos.")
+                # -------------------------------------------------
+                # 5) Dictamen final
+                # -------------------------------------------------
+                st.markdown("---")
+                st.subheader("🧾 Dictamen final")
 
-    st.caption("📌 **AIC/BIC** son comparativos entre **modelos**: valores más bajos indican mejor ajuste relativo. "
-               "Use esta sección para comparar Poisson vs Binomial vs Hipergeométrica ante la misma variable.")
+                chi2_reject = (pval < alpha)
+                mc_reject = (pval_mc is not None) and (pval_mc < alpha)
+
+                if decision_mode_disc.startswith("Estricto"):
+                    if chi2_reject or mc_reject:
+                        driver = "Monte Carlo" if mc_reject else "Chi² clásico"
+                        st.error(f"**Dictamen final (estricto):** Rechazar H₀ (α={alpha}). "
+                                 f"Decisión basada en **{driver}**.")
+                    else:
+                        base = "Monte Carlo" if pval_mc is not None else "Chi² clásico"
+                        st.success(f"**Dictamen final (estricto):** No rechazar H₀ (α={alpha}). "
+                                   f"Decisión basada en **{base}**.")
+                else:
+                    if chi2_reject:
+                        st.error(f"**Dictamen final (docente):** Rechazar H₀ (α={alpha}). "
+                                 f"Según Chi² (p={pval:.4f}).")
+                    else:
+                        st.success(f"**Dictamen final (docente):** No rechazar H₀ (α={alpha}). "
+                                   f"Según Chi² (p={pval:.4f}).")
+                        if pval_mc is not None and (mc_reject != chi2_reject):
+                            st.info("ℹ️ Nota: Monte Carlo llegó a una conclusión distinta; sensible a esperados bajos.")
+
+                st.caption("📌 **AIC/BIC** son comparativos entre **modelos**: valores más bajos indican mejor ajuste relativo. "
+                           "Use esta sección para comparar Poisson vs Binomial vs Hipergeométrica ante la misma variable.")
 
 
 
@@ -1159,4 +1158,3 @@ with tabs[5]:
                     "Comparar ambas curvas ayuda a decidir políticas de control: "
                     "reforzar refrigeración, ajustar tiempos de distribución o "
                     "establecer límites de seguridad en logística.")
-
