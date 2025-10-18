@@ -705,12 +705,14 @@ with tabs[3]:
         st.error("❌ La variable 'data' no existe en este contexto. Mueve el bloque de carga fuera de las pestañas.")
         st.stop()
 
-    if data is None or data.empty:
-        st.warning("⚠️ No hay datos cargados o el DataFrame está vacío. Sube un archivo en la barra lateral.")
-        st.stop()
+    if data is None:
+        st.warning("⚠️ No hay datos cargados. Sube un archivo en la barra lateral.")
+    elif data.empty:
+        st.error("❌ El DataFrame está vacío. Revisa que el archivo tenga datos válidos.")
     else:
         st.success(f"✅ Archivo cargado con {len(data)} registros y {len(data.columns)} columnas.")
         st.write("Columnas detectadas:", list(data.columns))
+
 
     # --- Banner de contexto ---
     st.info(f"🔎 Nivel de significancia actual: **α = {alpha}**\n\n📌 Modo de decisión: **{decision_mode_disc}**")
@@ -1157,22 +1159,4 @@ with tabs[5]:
                     "Comparar ambas curvas ayuda a decidir políticas de control: "
                     "reforzar refrigeración, ajustar tiempos de distribución o "
                     "establecer límites de seguridad en logística.")
-
-
-
-
-
-
-
-
-
-
-                    
-
-
-
-
-
-
-
 
