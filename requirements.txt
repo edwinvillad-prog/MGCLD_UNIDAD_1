@@ -7,3 +7,5 @@ qrcode
 streamlit-option-menu
 statsmodels
 matplotlib
+openpyxl
+
