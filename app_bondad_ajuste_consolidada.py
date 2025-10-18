@@ -424,14 +424,29 @@ with tabs[2]:
         # NORMAL
         # =========================
         if dist_choice == "Normal":
+            x = np.array(x, dtype=float)
             mu, sigma = np.mean(x), np.std(x, ddof=1)
             D, pval = kstest(x, "norm", args=(mu, sigma))
             dist_info = f"Normal(μ={mu:.2f}, σ={sigma:.2f})"
-    
-            # ➕ Prueba Lilliefors (usando kstest_normal de statsmodels)
-            from statsmodels.stats.diagnostic import kstest_normal
-            stat_lillie, pval_lillie = kstest_normal(x)
-            have_lillie = True
+
+            # --- Validaciones previas ---
+            if len(x) < 5:
+                st.warning("⚠️ Se requieren al menos 5 observaciones válidas para aplicar Lilliefors.")
+                have_lillie = False
+            elif len(np.unique(np.round(x, 3))) < 10:
+                st.warning("⚠️ La variable parece discreta (pocos valores distintos). "
+                   "Se omite Lilliefors para evitar errores.")
+                have_lillie = False
+            else:
+                # --- Prueba Lilliefors segura ---
+                try:
+                    from statsmodels.stats.diagnostic import kstest_normal
+                    stat_lillie, pval_lillie = kstest_normal(x)
+                    have_lillie = True
+                except Exception as e:
+                    have_lillie = False
+                    st.error(f"❌ Error al aplicar Lilliefors: {e}")
+
 
             # ➕ Shapiro–Wilk (solo si n < 20)
             if n < 20:
@@ -1109,6 +1124,9 @@ with tabs[5]:
                     "Comparar ambas curvas ayuda a decidir políticas de control: "
                     "reforzar refrigeración, ajustar tiempos de distribución o "
                     "establecer límites de seguridad en logística.")
+
+
                     
+
 
 
