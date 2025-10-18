@@ -698,59 +698,50 @@ with tabs[2]:
 with tabs[3]:
     st.header("🧮 Validación avanzada de modelos discretos")
 
-    # --- 🔰 Verificación de carga de datos ---
-    if data is None:
-        st.warning("⚠️ No se ha cargado ningún archivo aún. Sube un archivo en la barra lateral (CSV o Excel).")
+    # --- Comprobación explícita del DataFrame ---
+    try:
+        st.write("📂 Diagnóstico: tipo de 'data' =", type(data))
+    except NameError:
+        st.error("❌ La variable 'data' no existe en este contexto. Mueve el bloque de carga fuera de las pestañas.")
+        st.stop()
+
+    if data is None or data.empty:
+        st.warning("⚠️ No hay datos cargados o el DataFrame está vacío. Sube un archivo en la barra lateral.")
         st.stop()
     else:
-        st.markdown("✅ **Archivo cargado correctamente.**")
-        st.write("**Columnas detectadas:**", list(data.columns))
+        st.success(f"✅ Archivo cargado con {len(data)} registros y {len(data.columns)} columnas.")
+        st.write("Columnas detectadas:", list(data.columns))
 
-    # --- Banner de contexto (α y modo de decisión para discretas) ---
-    st.info(f"🔎 Nivel de significancia actual: **α = {alpha}**\n\n"
-            f"📌 Modo de decisión: **{decision_mode_disc}**")
+    # --- Banner de contexto ---
+    st.info(f"🔎 Nivel de significancia actual: **α = {alpha}**\n\n📌 Modo de decisión: **{decision_mode_disc}**")
 
-    st.markdown("Esta sección valida **modelos discretos** (Poisson, Binomial, Hipergeométrica) "
-                "usando log-verosimilitud, AIC/BIC y análisis de residuos (Pearson y deviance). "
-                "Además, detecta automáticamente variables tipo Likert (1–10) y aplica una prueba de uniformidad Chi².")
-
-    # --------------------------------------------------------------
-    # Selección de variable y preprocesamiento inicial
-    # --------------------------------------------------------------
+    # --- Selección de variable ---
     numeric_cols = data.select_dtypes(include=[np.number, "object"]).columns.tolist()
     if not numeric_cols:
-        st.error("❌ No hay columnas numéricas o convertibles en el archivo. "
-                 "Verifique el formato de sus datos.")
+        st.error("❌ No se detectaron columnas numéricas o convertibles.")
         st.stop()
 
     variable = st.selectbox("Seleccione variable discreta", numeric_cols, key="val_disc_var")
 
-    # --- Conversión y limpieza de datos ---
-    x = data[variable].dropna()
-    x = pd.to_numeric(x, errors="coerce").dropna().astype(float).values
+    # --- Conversión robusta a numérico ---
+    x = pd.to_numeric(data[variable], errors="coerce").dropna().astype(float).values
+    st.write("🧪 Valores únicos detectados:", np.unique(x))
 
-    st.write("🧪 Valores únicos detectados:", np.unique(x))  # Diagnóstico visible
-
-    # --------------------------------------------------------------
-    # 🔍 Detección automática de variable tipo Likert (1–10)
-    # --------------------------------------------------------------
+    # --- Detección Likert ---
     unique_vals = np.unique(x)
     if len(unique_vals) <= 10 and np.nanmin(unique_vals) >= 1 and np.nanmax(unique_vals) <= 10:
         st.subheader("📊 Bondad de ajuste uniforme (escala discreta tipo Likert)")
-
         obs_counts = pd.Series(x).value_counts().sort_index()
         k = len(obs_counts)
-        exp_counts = np.ones(k) * len(x) / k  # esperados iguales
-
+        exp_counts = np.ones(k) * len(x) / k
         chi2, pval = chisquare(obs_counts, f_exp=exp_counts)
-        st.write(f"**Estadístico = {chi2:.3f}**, **p-valor = {pval:.4f}**")
 
+        st.write(f"**Estadístico = {chi2:.3f}**, **p-valor = {pval:.4f}**")
         if pval < alpha:
             st.error("❌ Rechazar H₀: las respuestas **no** son uniformes.")
         else:
             st.success("✅ No rechazar H₀: las respuestas parecen uniformes entre categorías.")
 
-        # --- Gráfico Observado vs Esperado ---
         fig = go.Figure()
         fig.add_bar(x=obs_counts.index, y=obs_counts.values, name="Observados", marker_color="#003366")
         fig.add_scatter(x=obs_counts.index, y=exp_counts, mode="lines+markers",
@@ -760,15 +751,16 @@ with tabs[3]:
                           template="plotly_white")
         st.plotly_chart(fig, use_container_width=True)
 
-        st.caption("ℹ️ Se detectó una variable tipo Likert. La validación se detiene aquí para no aplicar modelos Poisson/Binomial innecesarios.")
+        st.caption("ℹ️ Variable Likert detectada. Fin de la validación discreta.")
         st.stop()
 
-    # --------------------------------------------------------------
-    # Si no es Likert, continuar con los modelos clásicos
-    # --------------------------------------------------------------
+    # --- Si no es Likert, continuar normalmente ---
+    st.markdown("✅ Variable no es Likert: continuar con modelos Poisson, Binomial e Hipergeométrica.")
+
     dist_choice = st.radio("Modelo discreto a validar",
                            ["Poisson", "Binomial", "Hipergeométrica"],
                            key="val_disc_dist")
+
 
     # Vector de observaciones discretas
     x = data[variable].dropna().values
@@ -1173,7 +1165,10 @@ with tabs[5]:
 
 
 
+
+
                     
+
 
 
 
