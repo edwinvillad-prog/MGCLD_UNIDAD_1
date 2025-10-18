@@ -726,7 +726,8 @@ with tabs[3]:
 
     # --- Conversión robusta a numérico ---
     x = pd.to_numeric(data[variable], errors="coerce").dropna().astype(float).values
-    st.write("🧪 Valores únicos detectados:", np.unique(x))
+    unique_vals = np.unique(x)
+    st.markdown(f"🧪 **Valores únicos detectados:** {', '.join(map(str, unique_vals))}")
 
     # --- Detección Likert ---
     unique_vals = np.unique(x)
@@ -1165,5 +1166,6 @@ with tabs[5]:
                     "Comparar ambas curvas ayuda a decidir políticas de control: "
                     "reforzar refrigeración, ajustar tiempos de distribución o "
                     "establecer límites de seguridad en logística.")
+
 
 
