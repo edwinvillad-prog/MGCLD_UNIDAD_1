@@ -46,9 +46,9 @@ with tabs[0]:
         st.markdown("---")
         col1, col2 = st.columns(2)
         with col1:
-            beta1 = st.slider("β₁ (Tempranas, β<1)", 0.20, 0.99, 0.90, help="Fallas iniciales por defectos de fabricación/instalación.")
-            beta3 = st.slider("β₂ (Desgaste, β>1)", 1.01, 3.00, 1.50, help="Fallas progresivas por envejecimiento/fricción.")
+            beta1 = st.slider("β₁ (Tempranas, β<1)", 0.10, 0.99, 0.90, help="Fallas iniciales por defectos de fabricación/instalación.")
             beta2 = st.slider("β₃ (Aleatorias, ≈1)", 0.90, 1.10, 1.00, help="Fallas no predecibles (choques aleatorios).")
+            beta3 = st.slider("β₂ (Desgaste, β>1)", 1.01, 10.00, 1.50, help="Fallas progresivas por envejecimiento/fricción.")
         with col2:
             eta1 = st.slider("η₁ (Tempranas, días)", 5, 50, 20, help="Vida característica en el escenario de fallas tempranas.")
             eta2 = st.slider("η₂ (Desgaste, días)", 5, 50, 25, help="Vida característica cuando domina el desgaste.")
@@ -102,7 +102,7 @@ with tabs[1]:
         st.markdown("**t:** tiempo operativo o revisión (días).")
         st.markdown("**Costo:** pérdida económica por parada no planificada (USD).")
 
-        beta = st.number_input("β (forma)", 0.10, 5.00, 1.50)
+        beta = st.number_input("β (forma)", 0.10, 10.00, 1.50)
         eta = st.number_input("η (escala, días)", 1.0, 120.0, 25.0)
         costo = st.number_input("Costo por parada (USD)", 0.0, 20000.0, 1200.0)
         t_fail = st.slider("Tiempo de evaluación t (días)", 1, 120, 20)
@@ -262,3 +262,4 @@ with tabs[3]:
 # ------------------------------------------------------
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(f"<p style='text-align:center; color:{UPS_BLUE};'><b>M.Sc. Edwin Villarreal, Fís. — Universidad Politécnica Salesiana (UPS)</b></p>", unsafe_allow_html=True)
+
