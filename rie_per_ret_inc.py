@@ -64,13 +64,13 @@ with tabs[0]:
         col1, col2 = st.columns(2)
         with col1:
             beta1 = st.slider("β₁ (Tempranas, β<1)", 0.10, 0.99, 0.90)
-            beta2 = st.slider("β₃ (Aleatorias, ≈1)", 0.90, 1.10, 1.00)
-            beta3 = st.slider("β₂ (Desgaste, β>1)", 1.01, 10.00, 1.50)
+            beta2 = st.slider("β₂ (Aleatorias, ≈1)", 0.90, 1.10, 1.00)
+            beta3 = st.slider("β₃ (Desgaste, β>1)", 1.01, 10.00, 1.50)
         with col2:
-            eta1 = st.slider(f"η₁ (Tempranas, {sufijo_tiempo})", 5, 50, 20)
-            eta2 = st.slider(f"η₂ (Desgaste, {sufijo_tiempo})", 5, 50, 25)
-            eta3 = st.slider(f"η₃ (Aleatorias, {sufijo_tiempo})", 5, 50, 12)
-        t_max = st.slider(f"Tiempo máximo ({sufijo_tiempo})", 10, 120, 40)
+            eta1 = st.slider(f"η₁ (Tempranas, {sufijo_tiempo})", 0, 50, 20)
+            eta2 = st.slider(f"η₂ (Desgaste, {sufijo_tiempo})", 0, 50, 25)
+            eta3 = st.slider(f"η₃ (Aleatorias, {sufijo_tiempo})", 0, 50, 12)
+        t_max = st.slider(f"Tiempo máximo ({sufijo_tiempo})", 0, 120, 40)
 
     with col_plot:
         def weibull_R(t, beta, eta):
@@ -303,6 +303,7 @@ st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(
     f"<p style='text-align:center; color:{UPS_BLUE};'><b>M.Sc. Edwin Villarreal, Fís. — Universidad Politécnica Salesiana (UPS)</b></p>",
     unsafe_allow_html=True)
+
 
 
 
