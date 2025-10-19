@@ -55,10 +55,10 @@ with tabs[0]:
         st.markdown("**t (tiempo):** Horizonte de operación (días).")
         st.markdown("---")
 
-        # 🔹 Nuevo selector de unidad de tiempo
+        # 🔹 Nuevo selector de unidad de tiempo con clave única
         unidad_w = st.radio("Unidad de tiempo",
                             ["Horas", "Días", "Semanas", "Meses", "Años"],
-                            index=1, horizontal=True)
+                            index=1, horizontal=True, key="unidad_weibull")
         sufijo_tiempo = unidad_w.lower()
 
         col1, col2 = st.columns(2)
@@ -121,10 +121,10 @@ with tabs[1]:
         st.markdown("**t:** tiempo operativo o revisión (días).")
         st.markdown("**Costo:** pérdida económica por parada no planificada (USD).")
 
-        # 🔹 Nuevo selector de unidad
+        # 🔹 Nuevo selector de unidad con clave única
         unidad_b = st.radio("Unidad de tiempo",
                             ["Horas", "Días", "Semanas", "Meses", "Años"],
-                            index=1, horizontal=True)
+                            index=1, horizontal=True, key="unidad_bomba")
         sufijo_tiempo_b = unidad_b.lower()
 
         beta = st.number_input("β (forma)", 0.10, 10.00, 1.50)
@@ -184,10 +184,10 @@ with tabs[2]:
 
     col1, col2 = st.columns([1.2, 1.8])
     with col1:
-        # 🔹 Selector de unidad de tiempo independiente
+        # 🔹 Selector de unidad de tiempo independiente (con clave única)
         unidad_c = st.radio("Unidad de tiempo",
                             ["Horas", "Días", "Semanas", "Meses", "Años"],
-                            index=2, horizontal=True)
+                            index=2, horizontal=True, key="unidad_contaminantes")
         sufijo_tiempo_c = unidad_c.lower()
 
         p = st.slider(f"Probabilidad de positivo por {sufijo_tiempo_c}", 0.001, 0.2, 0.03)
@@ -235,10 +235,10 @@ with tabs[3]:
     st.subheader("Incertidumbre en la proporción de positivos — Intervalo de Wilson")
     st.markdown(f"<h5 style='color:{UPS_GOLD};'>Evaluación de la precisión estadística de la proporción y del periodo de retorno</h5>", unsafe_allow_html=True)
 
-    # 🔹 Selector de unidad independiente
+    # 🔹 Selector de unidad independiente (con clave única)
     unidad_i = st.radio("Unidad de tiempo",
                         ["Horas", "Días", "Semanas", "Meses", "Años"],
-                        index=2, horizontal=True)
+                        index=2, horizontal=True, key="unidad_incertidumbre")
     sufijo_tiempo_i = unidad_i.lower()
 
     col1, col2 = st.columns([1.2, 2.2])
@@ -303,6 +303,8 @@ st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(
     f"<p style='text-align:center; color:{UPS_BLUE};'><b>M.Sc. Edwin Villarreal, Fís. — Universidad Politécnica Salesiana (UPS)</b></p>",
     unsafe_allow_html=True)
+
+
 
 
 
