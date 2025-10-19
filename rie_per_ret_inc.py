@@ -116,21 +116,26 @@ with tabs[1]:
     col1, col2 = st.columns([1.2, 1.8])
     with col1:
         st.markdown("### Parámetros de entrada e interpretación")
-        st.markdown("**β:** patrón de fallas (β>1 → desgaste del impulsor/sellos).")
-        st.markdown("**η:** vida media característica (días).")
-        st.markdown("**t:** tiempo operativo o revisión (días).")
-        st.markdown("**Costo:** pérdida económica por parada no planificada (USD).")
 
-        # 🔹 Nuevo selector de unidad con clave única
-        unidad_b = st.radio("Unidad de tiempo",
-                            ["Horas", "Días", "Semanas", "Meses", "Años"],
-                            index=1, horizontal=True, key="unidad_bomba")
+        # 🔹 Selector de unidad con clave única (DEBE ir antes para que el texto use la unidad elegida)
+        unidad_b = st.radio(
+            "Unidad de tiempo",
+            ["Horas", "Días", "Semanas", "Meses", "Años"],
+            index=1, horizontal=True, key="unidad_bomba"
+        )
         sufijo_tiempo_b = unidad_b.lower()
+
+        # 🔄 Textos dinámicos con la unidad seleccionada
+        st.markdown("**β:** patrón de fallas (β>1 → desgaste del impulsor/sellos).")
+        st.markdown(f"**η:** vida media característica ({sufijo_tiempo_b}).")
+        st.markdown(f"**t:** tiempo operativo o revisión ({sufijo_tiempo_b}).")
+        st.markdown("**Costo:** pérdida económica por parada no planificada (USD).")
 
         beta = st.number_input("β (forma)", 0.10, 10.00, 1.50)
         eta = st.number_input(f"η (escala, {sufijo_tiempo_b})", 1.0, 120.0, 25.0)
         costo = st.number_input("Costo por parada (USD)", 0.0, 20000.0, 1200.0)
         t_fail = st.slider(f"Tiempo de evaluación t ({sufijo_tiempo_b})", 1, 120, 20)
+
 
     with col2:
         def weibull_MTBF(beta, eta):
@@ -190,8 +195,8 @@ with tabs[2]:
                             index=2, horizontal=True, key="unidad_contaminantes")
         sufijo_tiempo_c = unidad_c.lower()
 
-        p = st.slider(f"Probabilidad de positivo por {sufijo_tiempo_c}", 0.001, 0.2, 0.03)
-        n_max = st.slider(f"Duración del monitoreo ({sufijo_tiempo_c})", 5, 100, 40)
+        p = st.slider(f"Probabilidad de positivo por {sufijo_tiempo_c}", 0.001, 0.4, 0.03)
+        n_max = st.slider(f"Duración del monitoreo ({sufijo_tiempo_c})", 0, 100, 40)
         n_eval = st.number_input(f"Intervalo de interés n ({sufijo_tiempo_c})", 1, 1000, 20)
 
     with col2:
@@ -303,6 +308,7 @@ st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(
     f"<p style='text-align:center; color:{UPS_BLUE};'><b>M.Sc. Edwin Villarreal, Fís. — Universidad Politécnica Salesiana (UPS)</b></p>",
     unsafe_allow_html=True)
+
 
 
 
