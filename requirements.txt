@@ -8,4 +8,5 @@ streamlit-option-menu
 statsmodels
 matplotlib
 openpyxl
+seaborn
 
