@@ -34,7 +34,7 @@ st.markdown(f"""
 <h1 style='text-align:center; color:{UPS_BLUE};'>
 📈 Super Laboratorio de Series Temporales </h1>
 <h4 style='text-align:center; color:black;'>
-Autor: M.Sc. Edwin Villarreal, Fís. — Universidad Politécnica Salesiana
+Autor: M.Sc. Edwin Villarreal, Fís. — M.Sc. Adriana López, Fís.
 </h4>
 """, unsafe_allow_html=True)
 # ===================== Utilidades =====================
@@ -1287,3 +1287,4 @@ with tab6:
 
         with open(tmpf.name, "rb") as f:
             st.download_button("⬇️ Descargar informe (.docx)", f, file_name="informe_unidad4.docx")
+
