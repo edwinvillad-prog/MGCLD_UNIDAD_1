@@ -390,14 +390,16 @@ if len(y) < 10:
 
 
 # ===================== PESTAÑAS =====================
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "1) Exploración",
     "2) Descomposición (STL)",
     "3) Modelado y Pronóstico",
-    "4) Control estadístico",
-    "5) Conclusiones y Recomendaciones",
-    "6) Exportar Word"
+    "4) Modelos de Markov y Monte Carlo",
+    "5) Control estadístico",
+    "6) Conclusiones y Recomendaciones",
+    "7) Exportar Word"
 ])
+
 
 # Acumuladores de conclusiones
 conc_exploracion, conc_stl, conc_modelo, conc_control = [], [], [], []
@@ -875,10 +877,50 @@ with tab3:
         st.warning("No se logró ajustar ningún modelo.")
         st.stop()
 
-    tbl = pd.DataFrame([{**m.metrics, "Modelo": m.name} for m in models]).set_index("Modelo").sort_values("RMSE")
+    #tbl = pd.DataFrame([{**m.metrics, "Modelo": m.name} for m in models]).set_index("Modelo").sort_values("RMSE")
+    #st.subheader("📊 Comparación de modelos (menor es mejor)")
+    #st.dataframe(tbl.style.format({"MAE": "{:.3f}", "RMSE": "{:.3f}", "MAPE%": "{:.2f}"}))
+    # ===================== Agregar columna de equivalencia clásica =====================
+    # ===================== Comparación de modelos =====================
     st.subheader("📊 Comparación de modelos (menor es mejor)")
-    st.dataframe(tbl.style.format({"MAE": "{:.3f}", "RMSE": "{:.3f}", "MAPE%": "{:.2f}"}))
 
+    tbl = (
+        pd.DataFrame([{**m.metrics, "Modelo": m.name} for m in models])
+        .set_index("Modelo")
+        .sort_values("RMSE")
+    )
+
+    # ===================== Agregar columna de equivalencia clásica =====================
+
+    def map_equivalente(nombre):
+        nombre = nombre.lower()
+        if "add, mul" in nombre:
+            return "Holt–Winters multiplicativo"
+        elif "add, add" in nombre:
+            return "Holt–Winters aditivo"
+        elif "sin tendencia" in nombre and "mul" in nombre:
+            return "SES estacional multiplicativo"
+        elif "sin tendencia" in nombre and "add" in nombre:
+            return "SES estacional aditivo"
+        elif "add" in nombre and "no estacional" in nombre:
+            return "Holt (doble suavizamiento)"
+        elif "sin tendencia" in nombre and "no estacional" in nombre:
+            return "SES (simple)"
+        elif "naive" in nombre:
+            return "Modelo Naïve estacional"
+        else:
+            return "—"
+
+    tbl["Equivalente clásico"] = tbl.index.to_series().apply(map_equivalente)
+
+
+    # Mostrar tabla única con formato
+    st.dataframe(
+        tbl[["Equivalente clásico", "MAE", "RMSE", "MAPE%"]]
+            .style.format({"MAE": "{:.3f}", "RMSE": "{:.3f}", "MAPE%": "{:.2f}"})
+    )
+
+    
     best = tbl.index[0]
     st.success(f"🏆 Mejor en prueba: **{best}**")
     best_model = next(m for m in models if m.name == best)
@@ -1122,13 +1164,131 @@ with tab3:
         st.warning("⚠️ No se generó pronóstico futuro; no se guardaron resultados para control estadístico.")
 
 
+# ===========================================================
+# 🔁 TAB 4 — MODELOS DE MARKOV + SIMULACIÓN MONTE CARLO
+# ===========================================================
+with tab4:
+    st.header("🔁 Modelos de Markov y Simulación Monte Carlo")
+    st.markdown("Esta sección estima la **matriz de transición de un proceso de Markov** a partir de los datos históricos "
+                "y simula su evolución mediante el método de **Monte Carlo**, "
+                "para analizar la probabilidad de permanecer o cambiar entre estados.")
+
+    file = st.file_uploader("📂 Sube una base de datos con una columna de estados (por ejemplo: 'Calidad', 'Estado de bomba', 'Condición sanitaria')", type=["csv"])
+    
+    if file:
+        import pandas as pd
+        import numpy as np
+
+        df = pd.read_csv(file)
+        col_estado = st.selectbox("Selecciona la columna de estados:", df.columns)
+        estados = df[col_estado].astype(str).values
+        unicos = sorted(df[col_estado].unique())
+        n = len(unicos)
+
+        # ======================================================
+        # 🔹 Estimación de la matriz de transición
+        # ======================================================
+        P = np.zeros((n, n))
+        for i in range(len(estados)-1):
+            a, b = estados[i], estados[i+1]
+            P[unicos.index(a), unicos.index(b)] += 1
+
+        # Normalización por filas
+        P = P / P.sum(axis=1, keepdims=True)
+
+        st.subheader("🔢 Matriz de transición estimada")
+        st.dataframe(pd.DataFrame(P, index=unicos, columns=unicos).round(3))
+
+        # ======================================================
+        # 🔹 Simulación Monte Carlo
+        # ======================================================
+        pasos = st.slider("Horizonte de simulación (pasos)", 1, 50, 12)
+        n_sim = st.slider("Número de simulaciones Monte Carlo", 100, 5000, 1000)
+        estado_inicial = st.selectbox("Estado inicial:", unicos, index=len(unicos)-1)
+
+        idx_ini = unicos.index(estado_inicial)
+        resultados = np.zeros((n_sim, pasos), dtype=int)
+
+        for i in range(n_sim):
+            estado = idx_ini
+            for t in range(pasos):
+                estado = np.random.choice(range(n), p=P[estado])
+                resultados[i, t] = estado
+
+        # ======================================================
+        # 🔹 Probabilidad empírica de cada estado
+        # ======================================================
+        probs = np.zeros((pasos, n))
+        for t in range(pasos):
+            vals, counts = np.unique(resultados[:, t], return_counts=True)
+            probs[t, vals] = counts / n_sim
+
+        prob_df = pd.DataFrame(probs, columns=unicos)
+        st.subheader("📊 Evolución probabilística de los estados")
+        st.line_chart(prob_df)
+
+        estado_final = unicos[np.argmax(probs[-1])]
+        st.success(f"🎯 Estado más probable al final del horizonte ({pasos} pasos): **{estado_final}**")
+
+        # ======================================================
+        # 🔹 Conclusiones del modelado estocástico
+        # ======================================================
+        st.markdown("## 📌 Conclusiones del modelo de Markov y simulación Monte Carlo")
+
+        def conclusion_box(text, color, icon):
+            st.markdown(
+                f"""
+                <div style="background-color:white; border-left: 6px solid {color};
+                            padding:8px; margin:6px; border-radius:5px;
+                            box-shadow: 0px 2px 4px rgba(0,0,0,0.1);">
+                    <b>{icon}</b> {text}
+                </div>
+                """, unsafe_allow_html=True
+            )
+
+        # --- 1. Resumen del proceso
+        conclusion_box(
+            f"📘 Se estimó una matriz de transición de tamaño <b>{n}×{n}</b> con base en los estados observados.",
+            "#0d6efd", ""
+        )
+
+        # --- 2. Interpretación de la simulación
+        conclusion_box(
+            f"🎲 Se ejecutaron <b>{n_sim}</b> simulaciones Monte Carlo durante <b>{pasos}</b> pasos, "
+            "permitiendo visualizar la evolución probabilística del sistema en el tiempo.",
+            "#6f42c1", ""
+        )
+
+        # --- 3. Estado dominante
+        conclusion_box(
+            f"🏆 El estado con mayor probabilidad al final del horizonte fue <b>{estado_final}</b>, "
+            "lo que sugiere una tendencia asintótica o de equilibrio del proceso.",
+            "#28a745", ""
+        )
+
+        # --- 4. Recomendaciones
+        conclusion_box(
+            "🧩 Se recomienda repetir la simulación con horizontes más amplios para evaluar la estabilidad de largo plazo "
+            "y utilizar esta matriz para calcular el estado estacionario del proceso de Markov.",
+            "#17a2b8", ""
+        )
+
+        # --- 5. Aplicación profesional
+        conclusion_box(
+            "🧀 En el contexto de la gestión de la calidad de la leche, estos resultados pueden representar la probabilidad "
+            "de que un tanque mantenga su clasificación de calidad o transite hacia estados de menor o mayor nivel sanitario.",
+            "#ffc107", ""
+        )
+
+    else:
+        st.info("📥 Esperando que subas una base de datos CSV para estimar el modelo de Markov.")
 
 
 
     
 
-# ===================== TAB 4: Control estadístico =====================
-with tab4:
+# ===================== TAB 5: Control estadístico =====================
+with tab5:
     if "best" not in st.session_state:
         st.warning("⚠️ Primero ejecute la pestaña 3 (Modelado y Pronóstico) para calcular residuales.")
     else:
@@ -1217,8 +1377,8 @@ with tab4:
             show_conclusiones("Conclusiones (Control estadístico)", conc_control)
 
 
-# ===================== TAB 5: Conclusiones y Recomendaciones =====================
-with tab5:
+# ===================== TAB 6: Conclusiones y Recomendaciones =====================
+with tab6:
     st.subheader("📋 Conclusiones y Recomendaciones")
 
     conclusiones, recomendaciones = [], []
@@ -1257,8 +1417,8 @@ with tab5:
     show_recomendaciones("Recomendaciones (Consolidadas)", recomendaciones)
 
 
-# ===================== TAB 6: Exportar Word =====================
-with tab6:
+# ===================== TAB 7: Exportar Word =====================
+with tab7:
     st.subheader("💾 Exportar informe en Word")
 
     if "tbl" not in st.session_state or "best" not in st.session_state:
@@ -1307,3 +1467,5 @@ with tab6:
 
         with open(tmpf.name, "rb") as f:
             st.download_button("⬇️ Descargar informe (.docx)", f, file_name="informe_unidad4.docx")
+
+
