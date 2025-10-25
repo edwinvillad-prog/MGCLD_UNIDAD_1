@@ -1322,6 +1322,17 @@ with tab5:
             st.latex(r"\textbf{Shewhart:}\quad UCL=\bar{x}+3\sigma,\ CL=\bar{x},\ LCL=\bar{x}-3\sigma")
             st.latex(r"\textbf{CUSUM:}\ \ C_t^+=\max\{0, x_t-(\mu_0+k)+C_{t-1}^+\},\ \ C_t^-=\max\{0, (\mu_0-k)-x_t+C_{t-1}^-\}")
 
+             # EWMA
+            st.subheader("EWMA (residuales)")
+            lam = st.slider("λ (EWMA)", 0.05, 0.5, 0.2, 0.05, key="lam")
+            z, UCL_e, LCL_e = ewma_chart(resid, lam)
+            f6, ax6 = plt.subplots(figsize=(11, 3))
+            ax6.plot(z.index, z.values)
+            ax6.plot(UCL_e.index, UCL_e.values, linestyle="--")
+            ax6.plot(LCL_e.index, LCL_e.values, linestyle="--")
+            st.pyplot(f6)
+            img_ewma = fig_to_bytes(f6)
+            
             # Shewhart
             st.subheader("Shewhart (residuales)")
             resid_s, UCL, LCL = shewhart_chart(resid)
@@ -1333,17 +1344,6 @@ with tab5:
             st.pyplot(f5)
             img_shewhart = fig_to_bytes(f5)
             ooc_shewhart = resid_s[(resid_s > UCL) | (resid_s < LCL)]
-
-            # EWMA
-            st.subheader("EWMA (residuales)")
-            lam = st.slider("λ (EWMA)", 0.05, 0.5, 0.2, 0.05, key="lam")
-            z, UCL_e, LCL_e = ewma_chart(resid, lam)
-            f6, ax6 = plt.subplots(figsize=(11, 3))
-            ax6.plot(z.index, z.values)
-            ax6.plot(UCL_e.index, UCL_e.values, linestyle="--")
-            ax6.plot(LCL_e.index, LCL_e.values, linestyle="--")
-            st.pyplot(f6)
-            img_ewma = fig_to_bytes(f6)
 
             # CUSUM
             st.subheader("CUSUM (residuales)")
@@ -1509,6 +1509,7 @@ with tab7:
 
         with open(tmpf.name, "rb") as f:
             st.download_button("⬇️ Descargar informe (.docx)", f, file_name="informe_unidad4.docx")
+
 
 
 
