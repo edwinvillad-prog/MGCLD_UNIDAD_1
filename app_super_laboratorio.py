@@ -1456,7 +1456,18 @@ with tab6:
     # 🔍 Conclusiones automáticas de control estadístico (vienen del TAB 5)
     # ----------------------------------------------------------------------
     st.markdown("### 📊 Conclusiones automáticas del monitoreo")
-
+    
+    # ----------------------------------------------------------------------
+    # Entrada manual del usuario
+    # ----------------------------------------------------------------------
+    st.markdown("**Añadir notas manuales**")
+    user_conc = st.text_area("Conclusiones adicionales")
+    user_rec = st.text_area("Recomendaciones adicionales")
+    
+    if user_conc:
+        conclusiones.append(user_conc)
+    if user_rec:
+        recomendaciones.append(user_rec)
     def conclusion_box(text, color):
         st.markdown(
             f"""
@@ -1531,17 +1542,6 @@ with tab6:
             recomendaciones.append("Ajustar planificación para evitar sobreproducción.")
         else:
             recomendaciones.append("Mantener el nivel operativo actual y continuar monitoreando la tendencia.")
-
-    # ----------------------------------------------------------------------
-    # Entrada manual del usuario
-    # ----------------------------------------------------------------------
-    st.markdown("**Añadir notas manuales**")
-    user_conc = st.text_area("Conclusiones adicionales")
-    user_rec = st.text_area("Recomendaciones adicionales")
-    if user_conc:
-        conclusiones.append(user_conc)
-    if user_rec:
-        recomendaciones.append(user_rec)
 
     # Guardar resultados en session_state
     st.session_state["conclusiones"] = conclusiones
@@ -1656,6 +1656,7 @@ with tab7:
                 f,
                 file_name=f"informe_unidad4_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
             )
+
 
 
 
