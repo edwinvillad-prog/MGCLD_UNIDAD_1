@@ -1321,8 +1321,31 @@ with tab5:
             st.latex(r"\textbf{EWMA:}\quad z_t=\lambda x_t + (1-\lambda)z_{t-1},\ \ \sigma_z=\sigma\sqrt{\tfrac{\lambda}{2-\lambda}}")
             st.latex(r"\textbf{Shewhart:}\quad UCL=\bar{x}+3\sigma,\ CL=\bar{x},\ LCL=\bar{x}-3\sigma")
             st.latex(r"\textbf{CUSUM:}\ \ C_t^+=\max\{0, x_t-(\mu_0+k)+C_{t-1}^+\},\ \ C_t^-=\max\{0, (\mu_0-k)-x_t+C_{t-1}^-\}")
+        # --- Significado de los términos en las ecuaciones ---
+        with st.expander("📘 Significado de los términos en las fórmulas"):
+            st.markdown("""
+            **EWMA (Exponentially Weighted Moving Average):**
+            - \( z_t \): estadístico suavizado (promedio ponderado de los residuales).  
+            - \( x_t \): valor del residual en el instante *t*.  
+            - \( \lambda \): peso del dato más reciente (0 < λ ≤ 1).  
+            - \( \sigma_z \): desviación estándar esperada del estadístico EWMA.  
+            - Si \( z_t \) supera los límites \( \pm 3\sigma_z \), el proceso muestra **deriva o tendencia gradual**.
 
-             # EWMA
+            **Shewhart (Control de medias individuales):**
+            - \( UCL, CL, LCL \): límites superior, central e inferior de control.  
+            - \( \bar{x} \): media histórica de los residuales.  
+            - \( \sigma \): desviación estándar del proceso.  
+            - Si algún punto excede ±3σ, se interpreta como una **alteración puntual** o **dato atípico**.
+
+            **CUSUM (Cumulative Sum):**
+            - \( C_t^+, C_t^- \): sumas acumuladas positivas y negativas de desviaciones.  
+            - \( \mu_0 \): valor medio objetivo del proceso.  
+            - \( k \): parámetro de referencia (sensibilidad del detector).  
+            - \( h \): umbral o límite de decisión (cuándo se considera fuera de control).  
+            - Si \( C_t^+ > h \) o \( C_t^- > h \), existe un **cambio sostenido en la media del proceso**.
+            """)
+
+            # EWMA
             st.subheader("EWMA (residuales)")
             lam = st.slider("λ (EWMA)", 0.05, 0.5, 0.2, 0.05, key="lam")
             z, UCL_e, LCL_e = ewma_chart(resid, lam)
@@ -1332,7 +1355,7 @@ with tab5:
             ax6.plot(LCL_e.index, LCL_e.values, linestyle="--")
             st.pyplot(f6)
             img_ewma = fig_to_bytes(f6)
-            
+
             # Shewhart
             st.subheader("Shewhart (residuales)")
             resid_s, UCL, LCL = shewhart_chart(resid)
@@ -1344,6 +1367,7 @@ with tab5:
             st.pyplot(f5)
             img_shewhart = fig_to_bytes(f5)
             ooc_shewhart = resid_s[(resid_s > UCL) | (resid_s < LCL)]
+
 
             # CUSUM
             st.subheader("CUSUM (residuales)")
@@ -1425,9 +1449,71 @@ with tab6:
 
     conclusiones, recomendaciones = [], []
 
+    # Consolidar todas las conclusiones previas
     conclusiones.extend(conc_exploracion + conc_stl + conc_modelo + conc_control)
 
-    # Recomendaciones automáticas
+    # ----------------------------------------------------------------------
+    # 🔍 Conclusiones automáticas de control estadístico (vienen del TAB 5)
+    # ----------------------------------------------------------------------
+    st.markdown("### 📊 Conclusiones automáticas del monitoreo")
+
+    def conclusion_box(text, color):
+        st.markdown(
+            f"""
+            <div style='background-color:white; border-left:6px solid {color};
+                        padding:8px; margin:6px; border-radius:5px;
+                        box-shadow:0px 2px 4px rgba(0,0,0,0.1);'>
+                {text}
+            </div>
+            """, unsafe_allow_html=True
+        )
+
+    # Recuperar residuales e indicadores si existen
+    resid_info = st.session_state.get("img_shewhart", None)
+    if "img_shewhart" in st.session_state and "img_cusum" in st.session_state:
+
+        # Estado de las variables clave de TAB 5
+        best = st.session_state.get("best_model_name", "")
+        tbl = st.session_state.get("tbl", None)
+
+        # 1️⃣ Modelo
+        if best:
+            conclusion_box(f"🧩 El modelo final utilizado para control fue **{best}**.", "#0d6efd")
+            conclusiones.append(f"El modelo final utilizado para control fue {best}.")
+
+        # 2️⃣ EWMA
+        if any("EWMA" in c for c in conc_control if "fuera" in c or "señal" in c):
+            conclusion_box("🚨 El control **EWMA** muestra posible deriva o tendencia. Se recomienda revisar calibración del proceso.",
+                           "#dc3545")
+            recomendaciones.append("Revisar la calibración o tendencia gradual detectada en el control EWMA.")
+        else:
+            conclusion_box("✅ El control **EWMA** no presenta señales de deriva — proceso estable.",
+                           "#198754")
+
+        # 3️⃣ Shewhart
+        if any("fuera de control" in c for c in conc_control):
+            conclusion_box("⚠️ El gráfico **Shewhart** indica puntos fuera de ±3σ. Puede existir una alteración puntual.",
+                           "#ffc107")
+            recomendaciones.append("Investigar causas específicas de los puntos fuera de control (Shewhart).")
+        else:
+            conclusion_box("✅ El gráfico **Shewhart** mantiene los puntos dentro de ±3σ — sin alteraciones relevantes.",
+                           "#198754")
+
+        # 4️⃣ CUSUM
+        if any("CUSUM" in c or "acumulaciones" in c for c in conc_control):
+            conclusion_box("🚨 El gráfico **CUSUM** muestra acumulaciones sostenidas — posible cambio estructural.",
+                           "#dc3545")
+            recomendaciones.append("Analizar causas de cambios estructurales o variaciones persistentes en el proceso.")
+        else:
+            conclusion_box("✅ El gráfico **CUSUM** no evidencia cambios acumulativos significativos.",
+                           "#198754")
+
+    else:
+        st.info("ℹ️ No se han generado resultados de control estadístico aún.")
+
+    # ----------------------------------------------------------------------
+    # Recomendaciones automáticas (según precisión y pronóstico)
+    # ----------------------------------------------------------------------
     if "tbl" in st.session_state and "best" in st.session_state:
         m = st.session_state["tbl"].loc[st.session_state["best"]]["MAPE%"]
         if pd.notna(m) and m < 10:
@@ -1443,7 +1529,12 @@ with tab6:
             recomendaciones.append("Planificar recursos para atender mayor demanda futura.")
         elif fmean < ymean:
             recomendaciones.append("Ajustar planificación para evitar sobreproducción.")
+        else:
+            recomendaciones.append("Mantener el nivel operativo actual y continuar monitoreando la tendencia.")
 
+    # ----------------------------------------------------------------------
+    # Entrada manual del usuario
+    # ----------------------------------------------------------------------
     st.markdown("**Añadir notas manuales**")
     user_conc = st.text_area("Conclusiones adicionales")
     user_rec = st.text_area("Recomendaciones adicionales")
@@ -1452,12 +1543,15 @@ with tab6:
     if user_rec:
         recomendaciones.append(user_rec)
 
+    # Guardar resultados en session_state
     st.session_state["conclusiones"] = conclusiones
     st.session_state["recomendaciones"] = recomendaciones
 
+    # ----------------------------------------------------------------------
+    # Visualización final consolidada
+    # ----------------------------------------------------------------------
     show_conclusiones("Conclusiones (Consolidadas)", conclusiones)
     show_recomendaciones("Recomendaciones (Consolidadas)", recomendaciones)
-
 
 # ===================== TAB 7: Exportar Word =====================
 with tab7:
@@ -1468,47 +1562,101 @@ with tab7:
     else:
         from docx import Document
         from docx.shared import Inches
-        import tempfile
+        from datetime import datetime
+        import tempfile, io
 
         def safe_add_pic(doc, img_bytes, title):
+            """Agrega imagen al Word si existe"""
             if img_bytes:
-                doc.add_paragraph(title)
+                doc.add_paragraph(title, style="List Bullet")
                 doc.add_picture(io.BytesIO(img_bytes), width=Inches(5))
+                doc.add_paragraph("")
 
+        # Crear documento
         doc = Document()
         doc.add_heading("Informe – Super Laboratorio (Unidad 4)", 0)
+        doc.add_paragraph(f"Fecha de generación: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
         doc.add_paragraph(f"Modelo seleccionado: {st.session_state['best']}")
+        doc.add_paragraph("")
 
+        # ----------------------------------------------------------
+        # 📊 DATOS BÁSICOS
+        # ----------------------------------------------------------
         doc.add_heading("Datos", level=1)
-        doc.add_paragraph(f"Observaciones: {len(y)}")
-        doc.add_paragraph(f"Frecuencia: {y.index.freqstr or 'no inferida'}")
+        doc.add_paragraph(f"Número de observaciones: {len(y)}")
+        doc.add_paragraph(f"Frecuencia temporal: {y.index.freqstr or 'no inferida'}")
+        if "freq_detected" in st.session_state:
+            doc.add_paragraph(f"Frecuencia detectada: {st.session_state['freq_detected']}")
+        doc.add_paragraph("")
 
-        doc.add_heading("Desempeño en prueba", level=1)
-        for k, v in st.session_state["tbl"].loc[st.session_state["best"]].items():
+        # ----------------------------------------------------------
+        # 📈 DESEMPEÑO DEL MODELO
+        # ----------------------------------------------------------
+        doc.add_heading("Desempeño del modelo", level=1)
+        best = st.session_state["best"]
+        tbl = st.session_state["tbl"].loc[best]
+        for k, v in tbl.items():
             doc.add_paragraph(f"{k}: {v}")
+        doc.add_paragraph("")
 
+        # ----------------------------------------------------------
+        # 📉 GRÁFICOS
+        # ----------------------------------------------------------
         doc.add_heading("Gráficas", level=1)
-        safe_add_pic(doc, img_series, "Serie temporal")
-        safe_add_pic(doc, st.session_state.get("img_fit"), "Ajuste y prueba")
+        safe_add_pic(doc, img_series, "Serie temporal observada")
+        safe_add_pic(doc, st.session_state.get("img_fit"), "Ajuste y conjunto de prueba")
         safe_add_pic(doc, st.session_state.get("img_forecast"), "Pronóstico futuro")
-        safe_add_pic(doc, st.session_state.get("img_shewhart"), "Carta Shewhart")
-        safe_add_pic(doc, st.session_state.get("img_ewma"), "Carta EWMA")
-        safe_add_pic(doc, st.session_state.get("img_cusum"), "Carta CUSUM")
-        safe_add_pic(doc, img_stl, "Descomposición STL")
+        safe_add_pic(doc, img_stl, "Descomposición estacional (STL)")
+        safe_add_pic(doc, st.session_state.get("img_shewhart"), "Carta de control Shewhart (residuales)")
+        safe_add_pic(doc, st.session_state.get("img_ewma"), "Carta de control EWMA")
+        safe_add_pic(doc, st.session_state.get("img_cusum"), "Carta de control CUSUM")
+        doc.add_paragraph("")
 
+        # ----------------------------------------------------------
+        # 🧠 CONCLUSIONES AUTOMÁTICAS
+        # ----------------------------------------------------------
         doc.add_heading("Conclusiones", level=1)
-        for c in st.session_state.get("conclusiones", []):
-            doc.add_paragraph(c, style="List Bullet")
+        if "conclusiones" in st.session_state:
+            for c in st.session_state.get("conclusiones", []):
+                doc.add_paragraph(c, style="List Bullet")
+        else:
+            doc.add_paragraph("No se registraron conclusiones automáticas.")
 
+        # ----------------------------------------------------------
+        # 🧩 RECOMENDACIONES
+        # ----------------------------------------------------------
         doc.add_heading("Recomendaciones", level=1)
-        for r in st.session_state.get("recomendaciones", []):
-            doc.add_paragraph(r, style="List Bullet")
+        if "recomendaciones" in st.session_state:
+            for r in st.session_state.get("recomendaciones", []):
+                doc.add_paragraph(r, style="List Bullet")
+        else:
+            doc.add_paragraph("No se registraron recomendaciones.")
 
+        # ----------------------------------------------------------
+        # 🧾 CONTROL ESTADÍSTICO (Resumen)
+        # ----------------------------------------------------------
+        doc.add_heading("Control Estadístico", level=1)
+        if "img_shewhart" in st.session_state or "img_ewma" in st.session_state or "img_cusum" in st.session_state:
+            doc.add_paragraph("El sistema de control estadístico permitió evaluar la estabilidad de los residuales mediante:")
+            doc.add_paragraph("• Carta de Shewhart: detección de puntos fuera de ±3σ.")
+            doc.add_paragraph("• Carta EWMA: detección de tendencias o derivas graduales.")
+            doc.add_paragraph("• Carta CUSUM: detección de acumulaciones sostenidas.")
+        else:
+            doc.add_paragraph("No se generaron gráficos de control estadístico en esta sesión.")
+
+        # ----------------------------------------------------------
+        # 💾 EXPORTACIÓN FINAL
+        # ----------------------------------------------------------
         tmpf = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
         doc.save(tmpf.name)
 
         with open(tmpf.name, "rb") as f:
-            st.download_button("⬇️ Descargar informe (.docx)", f, file_name="informe_unidad4.docx")
+            st.download_button(
+                "⬇️ Descargar informe (.docx)",
+                f,
+                file_name=f"informe_unidad4_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
+            )
+
 
 
 
