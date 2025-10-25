@@ -1374,8 +1374,50 @@ with tab5:
             else:
                 conc_control.append("EWMA no indica señal reciente de fuera de control.")
 
-            show_conclusiones("Conclusiones (Control estadístico)", conc_control)
+            # ----------------------------------------------------------------------
+            # 🔍 Conclusiones automáticas del monitoreo (nuevo bloque)
+            # ----------------------------------------------------------------------
+            st.markdown("### 📊 Conclusiones automáticas del monitoreo")
 
+            def conclusion_box(text, color):
+                st.markdown(
+                    f"""
+                    <div style='background-color:white; border-left:6px solid {color};
+                                padding:8px; margin:6px; border-radius:5px;
+                                box-shadow:0px 2px 4px rgba(0,0,0,0.1);'>
+                        {text}
+                    </div>
+                    """, unsafe_allow_html=True
+                )
+
+            import numpy as np
+
+            # --- EWMA ---
+            if np.any((z > UCL_e) | (z < LCL_e)):
+                conclusion_box("🚨 El gráfico **EWMA** detecta cambios graduales sostenidos en los residuales. "
+                               "El proceso podría estar mostrando deriva o nueva tendencia.", "#dc3545")
+            else:
+                conclusion_box("✅ El gráfico **EWMA** muestra estabilidad — sin señales de cambio estructural. "
+                               "Los residuales se comportan como ruido blanco.", "#198754")
+
+            # --- SHEWHART ---
+            fuera_shewhart = np.sum((resid_s > UCL) | (resid_s < LCL))
+            if fuera_shewhart > 0:
+                conclusion_box(f"⚠️ El gráfico **Shewhart** presenta {fuera_shewhart} punto(s) fuera de ±3σ. "
+                               "Podría existir una alteración puntual o dato atípico.", "#ffc107")
+            else:
+                conclusion_box("✅ El gráfico **Shewhart** indica que la variabilidad está dentro de límites normales.", "#198754")
+
+            # --- CUSUM ---
+            if np.any(cp > h) or np.any(cm > h):
+                conclusion_box("🚨 El gráfico **CUSUM** muestra acumulaciones sostenidas que superan el umbral. "
+                               "Esto sugiere cambios estructurales o inestabilidad en el proceso.", "#dc3545")
+            else:
+                conclusion_box("✅ El gráfico **CUSUM** se mantiene dentro de los límites — sin evidencia de cambio en la media.", "#198754")
+
+            # ----------------------------------------------------------------------
+
+            show_conclusiones("Conclusiones (Control estadístico)", conc_control)
 
 # ===================== TAB 6: Conclusiones y Recomendaciones =====================
 with tab6:
@@ -1467,5 +1509,7 @@ with tab7:
 
         with open(tmpf.name, "rb") as f:
             st.download_button("⬇️ Descargar informe (.docx)", f, file_name="informe_unidad4.docx")
+
+
 
 
