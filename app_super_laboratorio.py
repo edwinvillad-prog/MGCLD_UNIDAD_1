@@ -1324,7 +1324,7 @@ with tab5:
             # ===============================================================
             # BLOQUE EXPLICATIVO DE ECUACIONES CON LATEX RENDERIZADO
             # ===============================================================
-            st.markdown("## 📘 Significado de los términos en las ecuaciones")
+            #st.markdown("## 📘 Significado de los términos en las ecuaciones")
             
             # --- EWMA ---
             st.markdown("### 🔹 EWMA (Exponentially Weighted Moving Average)")
@@ -1676,6 +1676,7 @@ with tab7:
                 f,
                 file_name=f"informe_unidad4_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
             )
+
 
 
 
