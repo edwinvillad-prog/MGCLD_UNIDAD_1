@@ -1322,28 +1322,44 @@ with tab5:
             st.latex(r"\textbf{Shewhart:}\quad UCL=\bar{x}+3\sigma,\ CL=\bar{x},\ LCL=\bar{x}-3\sigma")
             st.latex(r"\textbf{CUSUM:}\ \ C_t^+=\max\{0, x_t-(\mu_0+k)+C_{t-1}^+\},\ \ C_t^-=\max\{0, (\mu_0-k)-x_t+C_{t-1}^-\}")
         # --- Significado de los términos en las ecuaciones ---
-        with st.expander("📘 Significado de los términos en las fórmulas"):
-            st.markdown("""
-            **EWMA (Exponentially Weighted Moving Average):**
-            - \( z_t \): estadístico suavizado (promedio ponderado de los residuales).  
-            - \( x_t \): valor del residual en el instante *t*.  
-            - \( \lambda \): peso del dato más reciente (0 < λ ≤ 1).  
-            - \( \sigma_z \): desviación estándar esperada del estadístico EWMA.  
-            - Si \( z_t \) supera los límites \( \pm 3\sigma_z \), el proceso muestra **deriva o tendencia gradual**.
+        # === Explicación de los términos ===
+            with st.expander("📘 Significado de los términos en las ecuaciones", expanded=True):
+                st.markdown(r"""
+                ### 🔹 **EWMA (Exponentially Weighted Moving Average)**  
+                \[
+                z_t = \lambda x_t + (1-\lambda)z_{t-1}, \quad \sigma_z = \sigma \sqrt{\tfrac{\lambda}{2-\lambda}}
+                \]
+                - \( z_t \): estadístico suavizado (promedio ponderado de los residuales).  
+                - \( x_t \): valor del residual en el instante \( t \).  
+                - \( \lambda \): peso del dato más reciente \((0 < \lambda \le 1)\).  
+                - \( \sigma_z \): desviación estándar esperada del estadístico EWMA.  
+                - Si \( z_t \) supera los límites \(\pm 3\sigma_z\), el proceso muestra **deriva o tendencia gradual**.  
+            
+                ---
+            
+                ### 🔹 **Shewhart (Control de medias individuales)**  
+                \[
+                UCL = \bar{x} + 3\sigma, \quad CL = \bar{x}, \quad LCL = \bar{x} - 3\sigma
+                \]
+                - \( UCL, CL, LCL \): límites superior, central e inferior de control.  
+                - \( \bar{x} \): media histórica de los residuales.  
+                - \( \sigma \): desviación estándar del proceso.  
+                - Si algún punto excede ±3σ, se interpreta como **alteración puntual o dato atípico**.  
+            
+                ---
+            
+                ### 🔹 **CUSUM (Cumulative Sum)**  
+                \[
+                C_t^+ = \max\{0, x_t - (\mu_0 + k) + C_{t-1}^+\}, \quad 
+                C_t^- = \max\{0, (\mu_0 - k) - x_t + C_{t-1}^-\}
+                \]
+                - \( C_t^+, C_t^- \): sumas acumuladas positivas y negativas de desviaciones.  
+                - \( \mu_0 \): valor medio objetivo del proceso.  
+                - \( k \): parámetro de referencia (sensibilidad del detector).  
+                - \( h \): umbral o límite de decisión (cuándo se considera fuera de control).  
+                - Si \( C_t^+ > h \) o \( C_t^- > h \), existe un **cambio sostenido en la media del proceso**.  
+                """)
 
-            **Shewhart (Control de medias individuales):**
-            - \( UCL, CL, LCL \): límites superior, central e inferior de control.  
-            - \( \bar{x} \): media histórica de los residuales.  
-            - \( \sigma \): desviación estándar del proceso.  
-            - Si algún punto excede ±3σ, se interpreta como una **alteración puntual** o **dato atípico**.
-
-            **CUSUM (Cumulative Sum):**
-            - \( C_t^+, C_t^- \): sumas acumuladas positivas y negativas de desviaciones.  
-            - \( \mu_0 \): valor medio objetivo del proceso.  
-            - \( k \): parámetro de referencia (sensibilidad del detector).  
-            - \( h \): umbral o límite de decisión (cuándo se considera fuera de control).  
-            - Si \( C_t^+ > h \) o \( C_t^- > h \), existe un **cambio sostenido en la media del proceso**.
-            """)
 
             # EWMA
             st.subheader("EWMA (residuales)")
@@ -1656,6 +1672,7 @@ with tab7:
                 f,
                 file_name=f"informe_unidad4_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
             )
+
 
 
 
