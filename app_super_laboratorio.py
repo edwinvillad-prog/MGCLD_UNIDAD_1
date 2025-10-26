@@ -320,9 +320,16 @@ if uploaded is None:
 # ===================== Carga de datos =====================
 try:
     df = pd.read_csv(uploaded, sep=sep)
+
+    # ✅ Guardar en memoria global para otras pestañas (Markov, Control, etc.)
+    st.session_state["df_base_principal"] = df.copy()
+    st.session_state.setdefault("bases_cargadas", {})["base_principal.csv"] = df.copy()
+
 except Exception as e:
     st.error(f"No se pudo leer el CSV: {e}")
     st.stop()
+
+    
 # Detectar columnas numéricas y de fecha
 num_cols: List[str] = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
 date_like: List[str] = [
@@ -1173,116 +1180,220 @@ with tab4:
                 "y simula su evolución mediante el método de **Monte Carlo**, "
                 "para analizar la probabilidad de permanecer o cambiar entre estados.")
 
-    file = st.file_uploader("📂 Sube una base de datos con una columna de estados (por ejemplo: 'Calidad', 'Estado de bomba', 'Condición sanitaria')", type=["csv"])
-    
-    if file:
-        import pandas as pd
-        import numpy as np
+    # ======================================================
+    # 💾 Límite de carga
+    # (Configúralo fuera del script: CLI o config.toml)
+    # ======================================================
+    # st.set_option("server.maxUploadSize", 1000)  # ← PROVOCA EXCEPCIÓN EN TU VERSIÓN
 
-        df = pd.read_csv(file)
-        col_estado = st.selectbox("Selecciona la columna de estados:", df.columns)
-        estados = df[col_estado].astype(str).values
-        unicos = sorted(df[col_estado].unique())
+    # ======================================================
+    # 🧠 Detección automática de base compatible (todas las cargadas)
+    # ======================================================
+    df_auto = None
+    nombre_base = None
+
+    # Buscar entre todas las bases cargadas
+    if "bases_cargadas" in st.session_state:
+        for nombre, df_temp in st.session_state["bases_cargadas"].items():
+            df_temp.columns = [c.strip() for c in df_temp.columns]
+            columnas_lower = [c.lower() for c in df_temp.columns]
+            columnas_estado = [df_temp.columns[i] for i, c in enumerate(columnas_lower) if "estado" in c]
+
+            if len(columnas_estado) >= 2:
+                col_estado_actual = columnas_estado[0]
+                col_estado_siguiente = columnas_estado[1]
+                st.success(f"✅ Detectadas columnas de transición en **{nombre}**: {col_estado_actual}, {col_estado_siguiente}")
+                df_auto = df_temp.rename(columns={
+                    col_estado_actual: "Estado_Actual",
+                    col_estado_siguiente: "Estado_Siguiente"
+                })
+                nombre_base = nombre
+                break
+
+            elif len(columnas_estado) == 1:
+                col_estado = columnas_estado[0]
+                st.info(f"ℹ️ Detectada columna de estado en **{nombre}**: {col_estado} — se usará para calcular transiciones consecutivas.")
+                df_auto = df_temp.rename(columns={col_estado: "Estado"})
+                nombre_base = nombre
+                break
+
+    if df_auto is not None:
+        st.markdown(f"<p style='color:#0d6efd;font-weight:bold;'>📂 Base seleccionada automáticamente: {nombre_base}</p>", unsafe_allow_html=True)
+    else:
+        st.warning("⚠️ No se detectaron bases con columnas 'estado'. Por favor, carga una base compatible.")
+
+    # ======================================================
+    # 🧠 Detección automática de base compatible (df1–df8)
+    # ======================================================
+    if df_auto is None:
+        for i in range(1, 9):  # busca en df1 ... df8
+            key = f"df{i}"
+            if key in st.session_state:
+                df_temp = st.session_state[key].copy()
+                df_temp.columns = [c.strip() for c in df_temp.columns]  # limpia espacios
+                columnas_lower = [c.lower() for c in df_temp.columns]
+
+                # Buscar columnas que contengan la palabra "estado"
+                columnas_estado = [df_temp.columns[i] for i, c in enumerate(columnas_lower) if "estado" in c]
+
+                if len(columnas_estado) >= 2:
+                    col_estado_actual = columnas_estado[0]
+                    col_estado_siguiente = columnas_estado[1]
+                    st.success(f"✅ Detectadas columnas de transición en **{key}**: {col_estado_actual}, {col_estado_siguiente}")
+                    df_auto = df_temp.rename(columns={
+                        col_estado_actual: "Estado_Actual",
+                        col_estado_siguiente: "Estado_Siguiente"
+                    })
+                    break
+
+                elif len(columnas_estado) == 1:
+                    col_estado = columnas_estado[0]
+                    st.info(f"ℹ️ Detectada una columna de estado en **{key}**: {col_estado} — se usará para calcular transiciones consecutivas.")
+                    df_auto = df_temp.rename(columns={col_estado: "Estado"})
+                    break
+
+    # ======================================================
+    # 📂 Si no se detectó base automáticamente
+    # ======================================================
+    if df_auto is None:
+        file = st.file_uploader("📂 Sube una base de datos con una columna de estados (por ejemplo: 'Calidad', 'Estado de bomba', 'Condición sanitaria')", type=["csv"])
+    else:
+        file = None
+        df = df_auto.copy()
+
+    # ======================================================
+    # 🔍 Si se cargó archivo o se detectó base automáticamente
+    # ======================================================
+    import pandas as pd
+    import numpy as np
+
+    df = None
+
+    # --- Si se detectó automáticamente ---
+    if df_auto is not None:
+        df = df_auto.copy()
+
+    # --- Si se subió manualmente ---
+    elif "file" in locals() and file is not None:
+        try:
+            df = pd.read_csv(file, sep=None, engine="python")
+        except Exception:
+            df = pd.read_csv(file)
+        df.columns = [c.strip() for c in df.columns]
+
+    # --- Si no hay nada cargado ---
+    if df is None:
+        st.info("📥 Esperando que subas o se detecte una base de datos CSV para estimar el modelo de Markov.")
+        st.stop()
+
+    # ======================================================
+    # 🔢 Cálculo de matriz de transición según tipo de base
+    # ======================================================
+    if {"Estado_Actual", "Estado_Siguiente"}.issubset(df.columns):
+        estados_actual = df["Estado_Actual"].astype(str).values
+        estados_siguiente = df["Estado_Siguiente"].astype(str).values
+        unicos = sorted(list(set(estados_actual) | set(estados_siguiente)))
         n = len(unicos)
+        P = pd.crosstab(estados_actual, estados_siguiente, normalize="index")\
+            .reindex(index=unicos, columns=unicos, fill_value=0).to_numpy()
 
-        # ======================================================
-        # 🔹 Estimación de la matriz de transición
-        # ======================================================
-        P = np.zeros((n, n))
-        for i in range(len(estados)-1):
-            a, b = estados[i], estados[i+1]
-            P[unicos.index(a), unicos.index(b)] += 1
-
-        # Normalización por filas
-        P = P / P.sum(axis=1, keepdims=True)
-
-        st.subheader("🔢 Matriz de transición estimada")
-        st.dataframe(pd.DataFrame(P, index=unicos, columns=unicos).round(3))
-
-        # ======================================================
-        # 🔹 Simulación Monte Carlo
-        # ======================================================
-        pasos = st.slider("Horizonte de simulación (pasos)", 1, 50, 12)
-        n_sim = st.slider("Número de simulaciones Monte Carlo", 100, 5000, 1000)
-        estado_inicial = st.selectbox("Estado inicial:", unicos, index=len(unicos)-1)
-
-        idx_ini = unicos.index(estado_inicial)
-        resultados = np.zeros((n_sim, pasos), dtype=int)
-
-        for i in range(n_sim):
-            estado = idx_ini
-            for t in range(pasos):
-                estado = np.random.choice(range(n), p=P[estado])
-                resultados[i, t] = estado
-
-        # ======================================================
-        # 🔹 Probabilidad empírica de cada estado
-        # ======================================================
-        probs = np.zeros((pasos, n))
-        for t in range(pasos):
-            vals, counts = np.unique(resultados[:, t], return_counts=True)
-            probs[t, vals] = counts / n_sim
-
-        prob_df = pd.DataFrame(probs, columns=unicos)
-        st.subheader("📊 Evolución probabilística de los estados")
-        st.line_chart(prob_df)
-
-        estado_final = unicos[np.argmax(probs[-1])]
-        st.success(f"🎯 Estado más probable al final del horizonte ({pasos} pasos): **{estado_final}**")
-
-        # ======================================================
-        # 🔹 Conclusiones del modelado estocástico
-        # ======================================================
-        st.markdown("## 📌 Conclusiones del modelo de Markov y simulación Monte Carlo")
-
-        def conclusion_box(text, color, icon):
-            st.markdown(
-                f"""
-                <div style="background-color:white; border-left: 6px solid {color};
-                            padding:8px; margin:6px; border-radius:5px;
-                            box-shadow: 0px 2px 4px rgba(0,0,0,0.1);">
-                    <b>{icon}</b> {text}
-                </div>
-                """, unsafe_allow_html=True
-            )
-
-        # --- 1. Resumen del proceso
-        conclusion_box(
-            f"📘 Se estimó una matriz de transición de tamaño <b>{n}×{n}</b> con base en los estados observados.",
-            "#0d6efd", ""
-        )
-
-        # --- 2. Interpretación de la simulación
-        conclusion_box(
-            f"🎲 Se ejecutaron <b>{n_sim}</b> simulaciones Monte Carlo durante <b>{pasos}</b> pasos, "
-            "permitiendo visualizar la evolución probabilística del sistema en el tiempo.",
-            "#6f42c1", ""
-        )
-
-        # --- 3. Estado dominante
-        conclusion_box(
-            f"🏆 El estado con mayor probabilidad al final del horizonte fue <b>{estado_final}</b>, "
-            "lo que sugiere una tendencia asintótica o de equilibrio del proceso.",
-            "#28a745", ""
-        )
-
-        # --- 4. Recomendaciones
-        conclusion_box(
-            "🧩 Se recomienda repetir la simulación con horizontes más amplios para evaluar la estabilidad de largo plazo "
-            "y utilizar esta matriz para calcular el estado estacionario del proceso de Markov.",
-            "#17a2b8", ""
-        )
-
-        # --- 5. Aplicación profesional
-        conclusion_box(
-            "🧀 En el contexto de la gestión de la calidad de la leche, estos resultados pueden representar la probabilidad "
-            "de que un tanque mantenga su clasificación de calidad o transite hacia estados de menor o mayor nivel sanitario.",
-            "#ffc107", ""
-        )
+    elif "Estado" in df.columns:
+        estados = df["Estado"].astype(str).values
+        unicos = sorted(pd.unique(df["Estado"].astype(str)))
+        n = len(unicos)
+        P = np.zeros((n, n), dtype=float)
+        for i in range(len(estados) - 1):
+            a, b = estados[i], estados[i + 1]
+            ia, ib = unicos.index(a), unicos.index(b)
+            P[ia, ib] += 1
+        row_sums = P.sum(axis=1, keepdims=True)
+        P = np.divide(P, np.where(row_sums == 0, 1, row_sums))
 
     else:
-        st.info("📥 Esperando que subas una base de datos CSV para estimar el modelo de Markov.")
+        st.warning("⚠️ No se encontró ninguna columna de estado válida para construir la matriz de transición.")
+        st.stop()
 
+    # ======================================================
+    # 🔢 Mostrar la matriz
+    # ======================================================
+    st.subheader("🔢 Matriz de transición estimada")
+    st.dataframe(pd.DataFrame(P, index=unicos, columns=unicos).round(3))
+
+    # ======================================================
+    # 🔹 Simulación Monte Carlo
+    # ======================================================
+    pasos = st.slider("Horizonte de simulación (pasos)", 1, 50, 12)
+    n_sim = st.slider("Número de simulaciones Monte Carlo", 100, 5000, 1000)
+    estado_inicial = st.selectbox("Estado inicial:", unicos, index=len(unicos) - 1)
+
+    idx_ini = unicos.index(estado_inicial)
+    resultados = np.zeros((n_sim, pasos), dtype=int)
+
+    for i in range(n_sim):
+        estado = idx_ini
+        for t in range(pasos):
+            estado = np.random.choice(range(n), p=P[estado])
+            resultados[i, t] = estado
+
+    # ======================================================
+    # 🔹 Evolución probabilística
+    # ======================================================
+    probs = np.zeros((pasos, n), dtype=float)
+    for t in range(pasos):
+        vals, counts = np.unique(resultados[:, t], return_counts=True)
+        probs[t, vals] = counts / n_sim
+
+    prob_df = pd.DataFrame(probs, columns=unicos)
+    st.subheader("📊 Evolución probabilística de los estados")
+    st.line_chart(prob_df)
+
+    estado_final = unicos[np.argmax(probs[-1])]
+    st.success(f"🎯 Estado más probable al final del horizonte ({pasos} pasos): **{estado_final}**")
+
+    # ======================================================
+    # 🔹 Conclusiones del modelado estocástico
+    # ======================================================
+    st.markdown("## 📌 Conclusiones del modelo de Markov y simulación Monte Carlo")
+
+    def conclusion_box(text, color, icon):
+        st.markdown(
+            f"""
+            <div style="background-color:white; border-left: 6px solid {color};
+                        padding:8px; margin:6px; border-radius:5px;
+                        box-shadow: 0px 2px 4px rgba(0,0,0,0.1);">
+                <b>{icon}</b> {text}
+            </div>
+            """, unsafe_allow_html=True
+        )
+
+    conclusion_box(
+        f"📘 Se estimó una matriz de transición de tamaño <b>{n}×{n}</b> con base en los estados observados.",
+        "#0d6efd", ""
+    )
+
+    conclusion_box(
+        f"🎲 Se ejecutaron <b>{n_sim}</b> simulaciones Monte Carlo durante <b>{pasos}</b> pasos, "
+        "permitiendo visualizar la evolución probabilística del sistema en el tiempo.",
+        "#6f42c1", ""
+    )
+
+    conclusion_box(
+        f"🏆 El estado con mayor probabilidad al final del horizonte fue <b>{estado_final}</b>, "
+        "lo que sugiere una tendencia asintótica o de equilibrio del proceso.",
+        "#28a745", ""
+    )
+
+    conclusion_box(
+        "🧩 Se recomienda repetir la simulación con horizontes más amplios para evaluar la estabilidad de largo plazo "
+        "y utilizar esta matriz para calcular el estado estacionario del proceso de Markov.",
+        "#17a2b8", ""
+    )
+
+    conclusion_box(
+        "🧀 En el contexto de la gestión de la calidad de la leche, estos resultados pueden representar la probabilidad "
+        "de que un tanque mantenga su clasificación de calidad o transite hacia estados de menor o mayor nivel sanitario.",
+        "#ffc107", ""
+    )
 
 
     
@@ -1676,6 +1787,7 @@ with tab7:
                 f,
                 file_name=f"informe_unidad4_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
             )
+
 
 
 
