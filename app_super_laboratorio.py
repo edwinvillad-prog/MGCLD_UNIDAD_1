@@ -450,36 +450,180 @@ with tab1:
             key="modo_tab1_exploracion"
         )
 
+        # =========================================================
+        # ✅ DETECCIÓN AUTOMÁTICA DE FRECUENCIA TEMPORAL
+        # =========================================================
+        if isinstance(y.index, pd.DatetimeIndex):
+            diffs = y.index.to_series().diff().dropna()
+            dias_promedio = diffs.dt.days.mean()
+
+            if dias_promedio <= 1.5:
+                freq = "Diaria"
+            elif dias_promedio <= 8:
+                freq = "Semanal"
+            elif dias_promedio <= 32:
+                freq = "Mensual"
+            elif dias_promedio <= 370:
+                freq = "Anual"
+            else:
+                freq = "Irregular"
+
+            st.caption(f"🧭 Frecuencia detectada automáticamente: **{freq}**")
+        else:
+            freq = "Irregular"
+
+        # =========================================================
+        #  GRÁFICO ESTÁTICO (CON ADAPTACIÓN SEGÚN FRECUENCIA)
+        # =========================================================
         if modo == "Estático":
             import plotly.graph_objects as go
 
             # ✅ Forzar meses en español con strftime
             fechas_es = y.index.strftime("%b %Y")
 
-            # === Gráfico interactivo con hover (para Streamlit) ===
-            fig_static = px.line(
-                x=fechas_es, y=y.values,
-                markers=True,
-                labels={"x": "Tiempo", "y": col_value},
-                title="Serie temporal"
-            )
+            # === Selección de estilo según frecuencia detectada ===
+            # =========================================================
+            # ✅ BLOQUE DE GRÁFICO SEGÚN FRECUENCIA DETECTADA
+            # =========================================================
+            if freq == "Diaria":
+                # === Serie diaria (línea continua) ===
+                fig_static = px.line(
+                    x=y.index, y=y.values,
+                    markers=False,
+                    labels={"x": "Tiempo", "y": col_value},
+                    title="Evolución diaria"
+                )
+                fig_static.update_traces(
+                    line=dict(color="royalblue", width=2.2),
+                    hovertemplate="Fecha: %{x|%d-%b-%Y}<br>Valor: %{y:.2f}"
+                )
+                fig_static.update_layout(
+                    xaxis=dict(
+                        tickformat="%b %Y",
+                        tickangle=0,
+                        showgrid=True,
+                        ticklabelmode="period"
+                    ),
+                    yaxis=dict(showgrid=True, zeroline=False),
+                    hovermode="x unified"
+                )
 
-            # Hover con fecha y valor exacto
-            fig_static.update_traces(hovertemplate="Fecha: %{x}<br>Valor: %{y}")
+            elif freq == "Semanal":
+                # === Serie semanal agregada ===
+                df_sem = y.resample("W").mean()
+                fig_static = px.line(
+                    x=df_sem.index, y=df_sem.values,
+                    markers=True,
+                    labels={"x": "Tiempo", "y": col_value},
+                    title="Evolución semanal (serie agregada)"
+                )
+                fig_static.update_traces(
+                    line=dict(shape="spline", color="seagreen", width=2.5),
+                    marker=dict(size=5, color="seagreen", line=dict(width=0)),
+                    hovertemplate="Semana: %{x|%d-%b-%Y}<br>Valor medio: %{y:.2f}"
+                )
+                fig_static.update_layout(
+                    xaxis=dict(
+                        tickformat="%d-%b %Y",
+                        tickangle=0,
+                        showgrid=True,
+                        ticklabelmode="period"
+                    ),
+                    yaxis=dict(showgrid=True, zeroline=False),
+                    hovermode="x unified"
+                )
 
-            # ✅ Layout limpio
-            fig_static = go.Figure(fig_static)
-            fig_static.update_layout(
-                xaxis=dict(
-                    tickmode="array",        # usar las etiquetas tal como vienen
-                    tickvals=fechas_es[::3], # mostrar 1 de cada 3 meses
-                    tickangle=0
-                ),
-                hovermode="x unified"
-            )
+            elif freq == "Mensual":
+                # === Serie mensual agregada ===
+                df_mes = y.resample("M").mean()
+                fig_static = px.line(
+                    x=df_mes.index, y=df_mes.values,
+                    markers=True,
+                    labels={"x": "Tiempo", "y": col_value},
+                    title="Evolución mensual"
+                )
+                fig_static.update_traces(
+                    line=dict(shape="spline", color="cornflowerblue", width=2.5),
+                    marker=dict(size=6, color="cornflowerblue", line=dict(width=0)),
+                    hovertemplate="Mes: %{x|%b %Y}<br>Valor medio: %{y:.2f}"
+                )
+                fig_static.update_layout(
+                    xaxis=dict(
+                        tickformat="%b %Y",
+                        tickangle=0,
+                        showgrid=True
+                    ),
+                    yaxis=dict(showgrid=True, zeroline=False),
+                    hovermode="x unified"
+                )
 
-            # Mostrar en Streamlit
+            elif freq == "Anual":
+                # === Serie anual agregada ===
+                df_ano = y.resample("Y").mean()
+                fig_static = px.line(
+                    x=df_ano.index, y=df_ano.values,
+                    markers=True,
+                    labels={"x": "Año", "y": col_value},
+                    title="Evolución anual (promedios)"
+                )
+                fig_static.update_traces(
+                    line=dict(shape="linear", color="mediumslateblue", width=2.5),
+                    marker=dict(size=7, color="mediumslateblue", line=dict(width=0)),
+                    hovertemplate="Año: %{x|%Y}<br>Promedio: %{y:.2f}"
+                )
+                fig_static.update_layout(
+                    xaxis=dict(
+                        tickformat="%Y",
+                        showgrid=True
+                    ),
+                    yaxis=dict(showgrid=True, zeroline=False),
+                    hovermode="x unified"
+                )
+
+            else:
+                # === Caso irregular o sin detección ===
+                fig_static = px.scatter(
+                    x=y.index, y=y.values,
+                    labels={"x": "Tiempo", "y": col_value},
+                    title="Serie irregular"
+                )
+                fig_static.update_traces(marker_color="firebrick", opacity=0.8)
+                fig_static.update_layout(
+                    xaxis=dict(showgrid=True),
+                    yaxis=dict(showgrid=True),
+                    hovermode="x unified"
+                )
+
+            # === Mostrar el gráfico final (ACTIVO) ===
             st.plotly_chart(fig_static, use_container_width=True)
+
+            # 🔒 DESACTIVADO para evitar eje categórico y doble render:
+            # (Se conserva el código original sin borrarlo)
+            # else:
+            #     fig_static = px.scatter(
+            #         x=fechas_es, y=y.values,
+            #         labels={"x": "Tiempo", "y": col_value},
+            #         title="Serie irregular"
+            #     )
+            #     fig_static.update_traces(marker_color="firebrick", opacity=0.8)
+
+            # # Hover con fecha y valor exacto (ya definido arriba por frecuencia; mantener como backup)
+            # fig_static.update_traces(hovertemplate="Fecha: %{x}<br>Valor: %{y}")
+
+            # # ✅ Layout limpio y coherente con tu diseño (versión categórica original)
+            # # ⚠️ Esto fuerza eje categórico; por eso se deja desactivado.
+            # # fig_static = go.Figure(fig_static)
+            # # fig_static.update_layout(
+            # #     xaxis=dict(
+            # #         tickmode="array",
+            # #         tickvals=fechas_es[::max(1, len(fechas_es)//12)],
+            # #         tickangle=0
+            # #     ),
+            # #     hovermode="x unified"
+            # # )
+
+            # # Mostrar en Streamlit (duplicado, por eso desactivado)
+            # # st.plotly_chart(fig_static, use_container_width=True)
 
             # === Snapshot PNG con Matplotlib (para exportar a Word) ===
             fig_tmp, ax = plt.subplots(figsize=(8, 3))
@@ -493,10 +637,12 @@ with tab1:
             ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
             fig_tmp.autofmt_xdate(rotation=0)
 
-            img_series = fig_to_bytes(fig_tmp)  # ← este PNG lo usas para exportar a Word
+            img_series = fig_to_bytes(fig_tmp)
             plt.close(fig_tmp)
 
-        # ================= Gráfico Animado (GIF) =================
+        # =========================================================
+        #  GRÁFICO ANIMADO (GIF)
+        # =========================================================
         else:
             fig, ax = plt.subplots(figsize=(10, 3))
             ax.set_title("Serie temporal (animada)")
@@ -526,15 +672,10 @@ with tab1:
                 interval=120, blit=True
             )
 
-            # ✅ Usar delete=False y NO remover manualmente
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".gif")
             ani.save(tmp.name, writer=PillowWriter(fps=10))
             st.image(tmp.name, caption="Animación de la serie temporal", use_container_width=True)
             # os.remove(tmp.name)  # 🔴 No borrar aquí en Windows
-
-
-
-
 
     with colB:
         # === Resumen estadístico ===
@@ -578,7 +719,6 @@ with tab1:
             """, unsafe_allow_html=True
         )
 
-    # Interpretaciones basadas en la tabla estadística
     mean_val = desc["mean"]
     median_val = desc["50%"]
     min_val = desc["min"]
@@ -596,7 +736,6 @@ with tab1:
     else:
         conclusion_box(f"Se detectaron {faltantes} valores faltantes en la serie.", "#ffc107", "⚠️")
 
-    # Tendencia aproximada (correlación con el tiempo)
     t = np.arange(len(y))
     corr_t = np.corrcoef(t, y.values)[0, 1]
     if abs(corr_t) > 0.3:
@@ -606,10 +745,69 @@ with tab1:
         conclusion_box("No se observa una <b>tendencia global marcada</b>.", "#6c757d", "➖")
 
 
-
 # ===================== TAB 2: Descomposición (STL) =====================
 with tab2:
-    default_s = 7 if (y.index.freqstr in ("D", "B")) else 12
+    import pandas as pd
+    import numpy as np
+    from statsmodels.tsa.seasonal import STL
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
+    # ==========================================================
+    # 🔍 Detección automática de frecuencia y periodo estacional
+    # ==========================================================
+    try:
+        freq = pd.infer_freq(y.index)
+    except Exception:
+        freq = None
+
+    if freq is None:
+        diffs = np.median(np.diff(y.index.values).astype("timedelta64[D]").astype(int))
+        if diffs <= 1:
+            freq = "D"
+        elif diffs <= 7:
+            freq = "W"
+        elif diffs <= 31:
+            freq = "M"
+        elif diffs <= 92:
+            freq = "Q"
+        else:
+            freq = "A"
+
+    if freq in ["D", "B"]:
+        default_s = 7
+        freq_label = "diaria"
+        tick_format = "%d-%b-%Y"
+        tick_interval = "M1"
+    elif freq in ["W", "W-SUN", "W-MON"]:
+        default_s = 52
+        freq_label = "semanal"
+        tick_format = "%b %Y"
+        tick_interval = "M2"
+    elif freq in ["M", "MS"]:
+        default_s = 12
+        freq_label = "mensual"
+        tick_format = "%b %Y"
+        tick_interval = "M3"
+    elif freq in ["Q", "QS"]:
+        default_s = 4
+        freq_label = "trimestral"
+        tick_format = "%b %Y"
+        tick_interval = "M6"
+    elif freq in ["A", "Y", "AS", "YS"]:
+        default_s = 1
+        freq_label = "anual"
+        tick_format = "%Y"
+        tick_interval = "Y1"
+    else:
+        default_s = 12
+        freq_label = "no detectada"
+        tick_format = "%b %Y"
+        tick_interval = "M3"
+
+    # Mensaje al usuario
+    st.info(f"📆 Frecuencia detectada automáticamente: **{freq_label}** (s = {default_s})")
+
     seasonal_periods_default = st.number_input(
         "Periodo estacional (s)",
         min_value=2, max_value=366,
@@ -617,48 +815,202 @@ with tab2:
         key="stl_s"
     )
 
+    # ==========================================================
+    # ⚙️ Ajuste STL (robusto)
+    # ==========================================================
     try:
-        # ------------------ Ajuste STL ------------------
+        # Asegurar limpieza y orden del índice
+        y = y.dropna().sort_index()
+
+        if len(y) < int(seasonal_periods_default) * 2:
+            st.warning("⚠️ La serie es demasiado corta para realizar una descomposición confiable.")
+            st.stop()
+
         stl = STL(y, period=int(seasonal_periods_default), robust=True)
         res = stl.fit()
 
-        # ------------------ Gráfico con máximo y mínimo ------------------
-        f, axes = plt.subplots(4, 1, figsize=(10, 6), sharex=True)
-        axes[0].plot(y, label="Observada", color="steelblue")
-        axes[0].set_title("Observada")
+        # ==========================================================
+        # 📊 Descomposición interactiva con Plotly
+        # ==========================================================
+        st.subheader("📈 Descomposición interactiva de la serie temporal")
 
-        # Calcular mes con máximo y mínimo
-        monthly_avg = y.groupby(y.index.month).mean()
-        max_month = int(monthly_avg.idxmax())
-        min_month = int(monthly_avg.idxmin())
-        max_val = monthly_avg.max()
-        min_val = monthly_avg.min()
+        # --- Calcular máximos y mínimos de manera segura ---
+        try:
+            if freq in ["D", "B", "W"]:
+                grouped = y.resample("M").mean().dropna()
+            else:
+                grouped = y.groupby(y.index.month).mean().dropna()
 
-        meses_es = {
-            1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio",
-            7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"
-        }
+            if len(grouped) == 0:
+                raise ValueError("No hay suficientes datos agrupados para identificar máximos/mínimos.")
 
-        # Índices exactos
-        idx_max = y[y.index.month == max_month].idxmax()
-        idx_min = y[y.index.month == min_month].idxmin()
+            max_period = grouped.idxmax()
+            min_period = grouped.idxmin()
 
-        # Valores estacionales en esos puntos
-        estacional_max = res.seasonal.loc[idx_max]
-        estacional_min = res.seasonal.loc[idx_min]
+            idx_max = y[y.index.isin([max_period])].idxmax()
+            idx_min = y[y.index.isin([min_period])].idxmin()
 
-        # Dibujar esferas en la gráfica
-        axes[0].scatter(idx_max, y.loc[idx_max], color="red", s=80, zorder=5, label="Máximo")
-        axes[0].scatter(idx_min, y.loc[idx_min], color="blue", s=80, zorder=5, label="Mínimo")
-        
-        # Otras componentes STL
-        axes[1].plot(res.trend, color="green"); axes[1].set_title("Tendencia")
-        axes[2].plot(res.seasonal, color="purple"); axes[2].set_title("Estacional")
-        axes[3].plot(res.resid, color="gray"); axes[3].set_title("Residuo")
-        st.pyplot(f)
+        except Exception:
+            # Fallback seguro: tomar máximo y mínimo global
+            idx_max = y.idxmax()
+            idx_min = y.idxmin()
+
+        # Crear figura con subplots
+        fig = make_subplots(
+            rows=4, cols=1, shared_xaxes=True,
+            subplot_titles=("Observada", "Tendencia", "Estacional", "Residuo"),
+            vertical_spacing=0.06
+        )
+
+        # --- Observada ---
+        fig.add_trace(
+            go.Scatter(
+                x=y.index, y=y.values,
+                mode="lines+markers",
+                name="Observada",
+                line=dict(color="steelblue"),
+                hovertemplate="Fecha: %{x|%d-%b-%Y}<br>Valor: %{y:.2f}"
+            ), row=1, col=1
+        )
+
+        # --- Marcadores de máximo y mínimo ---
+        fig.add_trace(
+            go.Scatter(
+                x=[idx_max], y=[y.loc[idx_max]],
+                mode="markers",
+                name="Máximo",
+                marker=dict(color="red", size=10, symbol="circle"),
+                hovertemplate="🔺 Máximo<br>Fecha: %{x|%d-%b-%Y}<br>Valor: %{y:.2f}"
+            ), row=1, col=1
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=[idx_min], y=[y.loc[idx_min]],
+                mode="markers",
+                name="Mínimo",
+                marker=dict(color="blue", size=10, symbol="circle"),
+                hovertemplate="🔹 Mínimo<br>Fecha: %{x|%d-%b-%Y}<br>Valor: %{y:.2f}"
+            ), row=1, col=1
+        )
+
+        # --- Etiquetas visibles (sin solapamiento) ---
+        fig.add_annotation(
+            x=idx_max, y=y.loc[idx_max],
+            text="Máximo",
+            showarrow=True,
+            arrowhead=2, ax=30, ay=-25,
+            font=dict(color="red", size=11, family="Arial Black"),
+            arrowcolor="red",
+            row=1, col=1
+        )
+        fig.add_annotation(
+            x=idx_min, y=y.loc[idx_min],
+            text="Mínimo",
+            showarrow=True,
+            arrowhead=2, ax=30, ay=25,
+            font=dict(color="blue", size=11, family="Arial Black"),
+            arrowcolor="blue",
+            row=1, col=1
+        )
+
+        # --- Tendencia ---
+        fig.add_trace(
+            go.Scatter(
+                x=y.index, y=res.trend,
+                mode="lines",
+                name="Tendencia",
+                line=dict(color="green"),
+                hovertemplate="Fecha: %{x|%d-%b-%Y}<br>Tendencia: %{y:.2f}"
+            ), row=2, col=1
+        )
+
+        # --- Estacional ---
+        fig.add_trace(
+            go.Scatter(
+                x=y.index, y=res.seasonal,
+                mode="lines",
+                name="Estacional",
+                line=dict(color="purple"),
+                hovertemplate="Fecha: %{x|%d-%b-%Y}<br>Estacionalidad: %{y:.2f}"
+            ), row=3, col=1
+        )
+
+        # --- Residuo ---
+        fig.add_trace(
+            go.Scatter(
+                x=y.index, y=res.resid,
+                mode="lines",
+                name="Residuo",
+                line=dict(color="gray"),
+                hovertemplate="Fecha: %{x|%d-%b-%Y}<br>Residuo: %{y:.2f}"
+            ), row=4, col=1
+        )
+
+        # --- Configuración general ---
+        fig.update_layout(
+            height=780,
+            template="plotly_white",
+            hovermode="x unified",
+            showlegend=False,
+            title=dict(text="🔍 Descomposición STL — Interactiva", x=0.5, xanchor="center"),
+        )
+
+        # --- Configurar eje X (menos ticks) ---
+        fig.update_xaxes(
+            tickformat=tick_format,
+            nticks=10,
+            showgrid=True,
+            row=4, col=1
+        )
+
+        fig.update_yaxes(showgrid=True)
+
+        # Mostrar figura interactiva
+        st.plotly_chart(fig, use_container_width=True)
+
+        # ==========================================================
+        # 💾 Versión estática original (respaldo)
+        # ==========================================================
+        with st.expander("🖼️ Versión estática original (referencia)"):
+            f, axes = plt.subplots(4, 1, figsize=(10, 6), sharex=True)
+            axes[0].plot(y, label="Observada", color="steelblue")
+            axes[0].set_title("Observada")
+
+            axes[0].scatter(idx_max, y.loc[idx_max], color="red", s=80, zorder=5, label="Máximo")
+            axes[0].scatter(idx_min, y.loc[idx_min], color="blue", s=80, zorder=5, label="Mínimo")
+
+            axes[1].plot(res.trend, color="green"); axes[1].set_title("Tendencia")
+            axes[2].plot(res.seasonal, color="purple"); axes[2].set_title("Estacional")
+            axes[3].plot(res.resid, color="gray"); axes[3].set_title("Residuo")
+
+            st.pyplot(f)
 
         # ------------------ Conclusiones ------------------
         st.markdown("## 📌 Conclusiones de la Descomposición STL")
+
+        # Diccionario de meses en español (para conclusiones)
+        meses_es = {
+            1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+            5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+            9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+        }
+        # === Variables necesarias para conclusiones (compatibilidad con versión previa) ===
+        try:
+            # Extraer los meses del índice máximo y mínimo
+            max_month = int(y.loc[idx_max].index.month[0]) if hasattr(y.loc[idx_max], "index") else int(idx_max.month)
+            min_month = int(y.loc[idx_min].index.month[0]) if hasattr(y.loc[idx_min], "index") else int(idx_min.month)
+
+            # Valores promedio y estacionales
+            max_val = y.loc[idx_max]
+            min_val = y.loc[idx_min]
+            estacional_max = res.seasonal.loc[idx_max]
+            estacional_min = res.seasonal.loc[idx_min]
+        except Exception:
+            # Fallback en caso de índices irregulares
+            max_month, min_month = 1, 7
+            max_val, min_val = float(y.max()), float(y.min())
+            estacional_max, estacional_min = 0, 0
+
 
         def conclusion_box(text: str, color: str = "#28a745", emoji: str = "✅"):
             st.markdown(
@@ -704,7 +1056,6 @@ with tab2:
             f"con <b>{min_val:.2f}</b>, afectado por una estacionalidad de <b style='color:blue;'>{estacional_min:.2f}</b>.",
             "#0d6efd", "📅"
         )
-    
 
         # ------------------ Resumen numérico ------------------
         var_total = np.var(y.values, ddof=1)
@@ -728,17 +1079,165 @@ with tab2:
             """,
             unsafe_allow_html=True,
         )
+        # -------------------------------------------------------------
+        # 💾 Guardar versión estática de la descomposición STL en sesión
+        # -------------------------------------------------------------
+        import io
+        buf = io.BytesIO()
+        f.savefig(buf, format="png", bbox_inches="tight")
+        st.session_state["img_stl"] = buf.getvalue()
 
     except Exception as e:
         st.warning(f"STL no pudo ajustarse: {e}")
         st.warning("No fue posible ajustar STL con los parámetros actuales.")
 
 
-
 # ===================== TAB 3: Modelado y Pronóstico ===================== 
 with tab3:
-# ===================== Detección automática de frecuencia =====================
+    # ===================== Sección teórica general =====================
+    with st.expander("📘 Fundamento teórico de los modelos de series temporales", expanded=False):
+
+        # ====================================================
+        # 1️⃣ MODELO ARIMA
+        # ====================================================
+        st.markdown("## 1️⃣ Modelo ARIMA (AutoRegressive Integrated Moving Average)")
+
+        st.markdown("""
+        El modelo **ARIMA(p, d, q)** combina tres componentes fundamentales:
+
+        - **AR (p):** parte *autoregresiva*, modela la dependencia lineal con los valores pasados de la serie.  
+        - **I (d):** parte *integrada*, elimina la tendencia y vuelve la serie estacionaria.  
+        - **MA (q):** parte de *promedio móvil*, modela el ruido o error pasado.
+        """)
+
+        st.markdown("**Ecuación general:**")
+        st.latex(r"""
+        y_t = c + \sum_{i=1}^{p} \phi_i\,y_{t-i} + \sum_{j=1}^{q} \theta_j\,\varepsilon_{t-j} + \varepsilon_t
+        """)
+
+        st.markdown("**Donde:**")
+        st.markdown("""
+        - $y_t$: valor observado en el tiempo $t$.  
+        - $\\varepsilon_t$: error aleatorio (*ruido blanco*).  
+        - $\\phi_i$, $\\theta_j$: coeficientes autoregresivos y de medias móviles.  
+        """)
+
+        st.info("""
+        💡 **Aplicación:** En el contexto de la **calidad de la leche**, el ARIMA permite pronosticar variables como el **conteo microbiano**, la **temperatura del tanque** o el **precio del productor**, considerando **tendencias y fluctuaciones a corto plazo**.
+        """)
+
+        st.divider()
+
+        # ====================================================
+        # 2️⃣ MODELO SARIMA
+        # ====================================================
+        st.markdown("## 2️⃣ Modelo SARIMA (Seasonal ARIMA)")
+
+        st.markdown("""
+        El modelo **SARIMA(p, d, q)(P, D, Q, s)** extiende a ARIMA incorporando **estacionalidad**, con un componente adicional que captura patrones repetitivos cada $s$ períodos.
+        """)
+
+        st.markdown("**Ecuación general:**")
+        st.latex(r"""
+        \Phi_P(L^s)\,\phi_p(L)\,(1 - L)^d\,(1 - L^s)^D\,y_t =
+        \Theta_Q(L^s)\,\theta_q(L)\,\varepsilon_t
+        """)
+
+        st.markdown("**Donde:**")
+        st.markdown("""
+        - $s$: número de observaciones por ciclo (por ejemplo, 12 meses o 52 semanas).  
+        - $\\Phi_P$, $\\Theta_Q$: componentes estacionales autoregresivos y de medias móviles.  
+        """)
+
+        st.info("""
+        💡 **Aplicación:** Útil para analizar variaciones **anuales o semanales** en el **conteo de UFC/ml**, reflejando patrones de contaminación según la estación seca o lluviosa.
+        """)
+
+        st.divider()
+
+        # ====================================================
+        # 3️⃣ MODELO ETS
+        # ====================================================
+        st.markdown("## 3️⃣ Modelo ETS (Error–Trend–Seasonal — Holt–Winters)")
+
+        st.markdown("""
+        Los modelos **ETS** utilizan *suavizamiento exponencial* para capturar patrones de **nivel**, **tendencia** y **estacionalidad**.  
+        Se ajustan mediante parámetros $\\alpha$, $\\beta$, $\\gamma$ que determinan el peso de las observaciones recientes.
+        """)
+
+        st.markdown("**Ecuaciones del modelo aditivo:**")
+        st.latex(r"""
+        \begin{cases}
+        \ell_t = \alpha (y_t - s_{t-m}) + (1 - \alpha)(\ell_{t-1} + b_{t-1}) \\
+        b_t = \beta (\ell_t - \ell_{t-1}) + (1 - \beta)b_{t-1} \\
+        s_t = \gamma (y_t - \ell_t) + (1 - \gamma)s_{t-m}
+        \end{cases}
+        """)
+
+        st.markdown("**Donde:**")
+        st.markdown("""
+        - $\\ell_t$: nivel suavizado.  
+        - $b_t$: tendencia estimada.  
+        - $s_t$: componente estacional.  
+        - $m$: longitud del ciclo.  
+        """)
+
+        st.info("""
+        💡 **Aplicación:** En la **producción de leche** o el **consumo energético mensual**, el modelo ETS representa con precisión **tendencias graduales y estacionalidad leve**.
+        """)
+
+        st.divider()
+
+        # ====================================================
+        # 4️⃣ MODELO NAÏVE
+        # ====================================================
+        st.markdown("## 4️⃣ Modelo Naïve (Referencia estacional)")
+
+        st.markdown("""
+        El modelo **Naïve** asume que el futuro repetirá el pasado sin cambios estructurales.  
+        Es la base de comparación para validar modelos más complejos.
+        """)
+
+        st.markdown("**Ecuaciones:**")
+        st.latex(r"""
+        \hat{y}_{t+h} = y_t \quad \text{o bien} \quad \hat{y}_{t+h} = y_{t+h-s}
+        """)
+
+        st.markdown("**Donde:**")
+        st.markdown("""
+        - $\\hat{y}_{t+h}$: valor pronosticado $h$ pasos adelante.  
+        - $y_t$: valor observado actual.  
+        - $s$: periodo estacional de repetición.  
+        """)
+
+        st.info("""
+        💡 **Aplicación:** Útil para estimaciones rápidas de **producción semanal** o **eficiencia energética**, donde el proceso se mantiene estable o sin tendencia significativa.
+        """)
+
+        st.divider()
+
+        # ====================================================
+        # 🧠 COMPARATIVO FINAL
+        # ====================================================
+        st.markdown("### 🧠 Comparativo general de los modelos")
+
+        st.markdown("""
+        | Modelo | Tendencia | Estacionalidad | Adecuado para |
+        |:--------|:----------:|:--------------:|:--------------|
+        | **ARIMA** | ✅ | ❌ | Series con tendencia sin estacionalidad |
+        | **SARIMA** | ✅ | ✅ | Series con patrones repetitivos (mensuales o anuales) |
+        | **ETS (Holt–Winters)** | ✅ | ✅ | Series con tendencia y estacionalidad suave |
+        | **Naïve** | ⚠️ Simple | ✅ | Procesos estables o como línea base |
+
+        💬 *En la gestión de la calidad de la leche, estos modelos permiten anticipar desviaciones en parámetros críticos, optimizar mantenimiento y reducir pérdidas por contaminación.*
+        """, unsafe_allow_html=True)
+
+
+
+    # ===================== Detección automática de frecuencia =====================
     import pandas as pd
+    import numpy as np
+    from statsmodels.tsa.stattools import acf
 
     # Intentar detectar frecuencia automáticamente
     try:
@@ -746,26 +1245,69 @@ with tab3:
     except Exception:
         freq = None
 
-    # Definir valores recomendados según frecuencia
+    # =====================================================
+    # 🔍 Mejora: detección automática de frecuencia y rangos
+    # =====================================================
+    # Si no se detecta frecuencia explícita, intentamos inferirla
+    # según la mediana de la diferencia de fechas
+    if freq is None:
+        diffs = np.median(np.diff(y.index.values).astype('timedelta64[D]').astype(int))
+        if diffs <= 1:
+            freq = "D"
+        elif diffs <= 7:
+            freq = "W"
+        elif diffs <= 31:
+            freq = "M"
+        elif diffs <= 92:
+            freq = "Q"
+        else:
+            freq = "A"
+
+    # =====================================================
+    # 🎯 Ajuste dinámico de parámetros según la frecuencia
+    # =====================================================
     if freq in ["D", "B"]:   # Diario o días hábiles
         s_default = 7    # semanal
-        p_range, d_range, q_range = (3, 1, 3)
+        p_range, d_range, q_range = (8, 2, 8)
     elif freq in ["W", "W-SUN", "W-MON"]:  # Semanal
         s_default = 52   # anual en semanas
-        p_range, d_range, q_range = (2, 1, 2)
-    elif freq in ["M"]:  # Mensual
+        p_range, d_range, q_range = (4, 2, 4)
+    elif freq in ["M", "MS"]:  # Mensual
         s_default = 12   # anual
-        p_range, d_range, q_range = (2, 1, 2)
-    elif freq in ["Q"]:  # Trimestral
+        p_range, d_range, q_range = (4, 2, 4)
+    elif freq in ["Q", "QS"]:  # Trimestral
         s_default = 4
-        p_range, d_range, q_range = (1, 1, 1)
-    elif freq in ["A", "Y"]:  # Anual
+        p_range, d_range, q_range = (2, 1, 2)
+    elif freq in ["A", "Y", "AS", "YS"]:  # Anual
         s_default = 1
         p_range, d_range, q_range = (1, 1, 1)
     else:
         # Fallback si no se detecta
         s_default = 12
-        p_range, d_range, q_range = (3, 1, 3)
+        p_range, d_range, q_range = (4, 2, 4)
+
+    # =====================================================
+    # 🧠 Análisis adicional: sugerencia de p y q mediante ACF
+    # =====================================================
+    try:
+        ac = acf(y, nlags=min(24, len(y)//3), fft=True)
+        lag1, lag2 = np.argsort(-np.abs(ac[1:5]))[:2] + 1
+        p_sugerido = int(lag1)
+        q_sugerido = int(lag2)
+        from statsmodels.tsa.stattools import adfuller
+
+        # --- Test de estacionariedad para sugerir d ---
+        try:
+            adf_pvalue = adfuller(y.dropna())[1]
+            if adf_pvalue < 0.05:
+                d_sugerido = 0  # ya estacionaria
+            else:
+                d_sugerido = 1  # necesita al menos una diferenciación
+        except Exception:
+            d_sugerido = 1
+
+    except Exception:
+        p_sugerido, q_sugerido = 1, 1
 
     # Guardar en session_state para que otras tabs lo usen
     st.session_state["freq_detected"] = freq
@@ -774,9 +1316,7 @@ with tab3:
     st.session_state["d_range"] = d_range
     st.session_state["q_range"] = q_range
 
-    st.info(f"📅 Frecuencia detectada: {freq}. Usando s={s_default}")
-
-
+    st.info(f"📅 Frecuencia detectada: **{freq}** — Período estacional estimado: s={s_default}")
 
     # ===================== Inferencia automática de frecuencia =====================
     try:
@@ -837,10 +1377,24 @@ with tab3:
             except Exception:
                 pass
 
+    # =====================================================
+    # 🔹 Bloque ARIMA mejorado con detección automática
+    # =====================================================
     with st.expander("ARIMA (opcional)"):
-        p = st.slider("p", 0, st.session_state["p_range"], 1, key="p")
-        d = st.slider("d", 0, st.session_state["d_range"], 0, key="d")
-        q = st.slider("q", 0, st.session_state["q_range"], 1, key="q")
+        p = st.slider("p", 0, st.session_state["p_range"],
+                    min(p_sugerido, st.session_state["p_range"]), key="p")
+        d = st.slider("d", 0, st.session_state["d_range"],
+                    min(d_sugerido, st.session_state["d_range"]), key="d")
+        q = st.slider("q", 0, st.session_state["q_range"],
+                    min(q_sugerido, st.session_state["q_range"]), key="q")
+
+        st.caption(
+            f"🧠 Rango ARIMA detectado: p∈[0,{p_range}], d∈[0,{d_range}], q∈[0,{q_range}] (s={s_default})"
+        )
+        st.caption(
+            f"📊 Sugerencia automática: p≈{p_sugerido}, d≈{d_sugerido}, q≈{q_sugerido} (según ACF + ADF)"
+        )
+
 
         try_arima = st.checkbox("Añadir ARIMA a la comparación", value=False, key="do_arima")
         if try_arima:
@@ -884,11 +1438,6 @@ with tab3:
         st.warning("No se logró ajustar ningún modelo.")
         st.stop()
 
-    #tbl = pd.DataFrame([{**m.metrics, "Modelo": m.name} for m in models]).set_index("Modelo").sort_values("RMSE")
-    #st.subheader("📊 Comparación de modelos (menor es mejor)")
-    #st.dataframe(tbl.style.format({"MAE": "{:.3f}", "RMSE": "{:.3f}", "MAPE%": "{:.2f}"}))
-    # ===================== Agregar columna de equivalencia clásica =====================
-    # ===================== Comparación de modelos =====================
     st.subheader("📊 Comparación de modelos (menor es mejor)")
 
     tbl = (
@@ -896,8 +1445,6 @@ with tab3:
         .set_index("Modelo")
         .sort_values("RMSE")
     )
-
-    # ===================== Agregar columna de equivalencia clásica =====================
 
     def map_equivalente(nombre):
         nombre = nombre.lower()
@@ -919,15 +1466,11 @@ with tab3:
             return "—"
 
     tbl["Equivalente clásico"] = tbl.index.to_series().apply(map_equivalente)
-
-
-    # Mostrar tabla única con formato
     st.dataframe(
         tbl[["Equivalente clásico", "MAE", "RMSE", "MAPE%"]]
             .style.format({"MAE": "{:.3f}", "RMSE": "{:.3f}", "MAPE%": "{:.2f}"})
     )
 
-    
     best = tbl.index[0]
     st.success(f"🏆 Mejor en prueba: **{best}**")
     best_model = next(m for m in models if m.name == best)
@@ -935,6 +1478,7 @@ with tab3:
     # Guardar para otras pestañas
     st.session_state["tbl"] = tbl
     st.session_state["best"] = best
+
 
     # ===================== Gráfico ajuste vs. prueba =====================
     
@@ -948,7 +1492,7 @@ with tab3:
     ax3.set_title(f"Desempeño del modelo {best}: Ajuste (Train) y Pronóstico (Test)")
     st.pyplot(f3)
     img_fit = fig_to_bytes(f3)
-    # ===================== Pronóstico futuro con el mejor modelo =====================
+    # ===================== Pronóstico futuro con el mejor modelo ===================== 
     st.subheader("🔮 Pronóstico futuro")
 
     # Reentrenar según el mejor modelo encontrado
@@ -1012,12 +1556,46 @@ with tab3:
     if future is not None and len(future) > 0:
         import plotly.graph_objects as go
 
-            # Crear figura interactiva
+        # Crear figura interactiva
         fig_forecast = go.Figure()
 
-        # Fechas en español
-        fechas_hist = y.index.strftime("%b %Y")
-        fechas_fut = future.index.strftime("%b %Y")
+        # ======================================================
+        # 🧭 Detección automática de frecuencia y formato del eje
+        # ======================================================
+        try:
+            freq = pd.infer_freq(y.index)
+        except Exception:
+            freq = None
+
+        # Definir formato de fechas y espaciado de ticks según la frecuencia
+        if freq in ["D", "B"]:
+            formato_fecha = "%d-%b-%Y"
+            titulo_eje_x = "Tiempo (diario)"
+            dtick_val = 7  # cada semana
+        elif freq in ["W", "W-SUN", "W-MON"]:
+            formato_fecha = "%d-%b-%Y"
+            titulo_eje_x = "Tiempo (semanal)"
+            dtick_val = 4  # 4 semanas ≈ 1 mes
+        elif freq in ["M", "MS"]:
+            formato_fecha = "%b %Y"
+            titulo_eje_x = "Tiempo (mensual)"
+            dtick_val = 1
+        elif freq in ["Q", "QS"]:
+            formato_fecha = "T%q-%Y"
+            titulo_eje_x = "Tiempo (trimestral)"
+            dtick_val = 1
+        elif freq in ["A", "Y", "AS", "YS"]:
+            formato_fecha = "%Y"
+            titulo_eje_x = "Tiempo (anual)"
+            dtick_val = 1
+        else:
+            formato_fecha = "%b %Y"
+            titulo_eje_x = "Tiempo"
+            dtick_val = 1
+
+        # Fechas formateadas para histórico y futuro
+        fechas_hist = y.index.strftime(formato_fecha)
+        fechas_fut = future.index.strftime(formato_fecha)
 
         # Serie observada
         fig_forecast.add_trace(go.Scatter(
@@ -1037,18 +1615,32 @@ with tab3:
             hovertemplate="Fecha: %{x}<br>Proyección: %{y:.2f}"
         ))
 
-        fig_forecast.update_layout(
-        title=f"Pronóstico con {best}",
-        xaxis=dict(
-            title="Tiempo",
-            tickangle=0,        # Mantiene las etiquetas horizontales
-            tickmode="linear",  # Genera ticks regulares
-            dtick=3             # Ajusta cada cuántos valores aparece un tick (aquí 2 → cada 2 meses)
-        ),
-        yaxis=dict(title=col_value),
-        hovermode="x unified"
-        )
+        # ======================================================
+        # 🎨 Ajuste visual del eje x según frecuencia y tamaño
+        # ======================================================
+        # Reducir el número de etiquetas de fecha para series largas
+        num_points = len(y)
+        max_ticks = 12  # máximo de etiquetas legibles
 
+        # Ajuste automático del paso de ticks según el tamaño de la serie
+        if num_points <= max_ticks:
+                tickstep = 1
+        else:
+            tickstep = max(1, num_points // max_ticks)
+
+        fig_forecast.update_layout(
+            title=f"Pronóstico con {best}",
+            xaxis=dict(
+                title=titulo_eje_x,
+                tickangle=-30,          # inclinación ligera para mejor lectura
+                tickmode="array",       # modo de ticks definidos manualmente
+                tickvals=list(range(0, len(fechas_hist), tickstep)),
+                ticktext=[fechas_hist[i] for i in range(0, len(fechas_hist), tickstep)],
+                showgrid=True
+            ),
+            yaxis=dict(title=col_value, showgrid=True),
+            hovermode="x unified"
+        )
 
 
         # Mostrar en la app
@@ -1395,8 +1987,40 @@ with tab4:
         "#ffc107", ""
     )
 
+    # ======================================================
+    # 💾 Guardar resultados en sesión para informe Word
+    # ======================================================
+    import io
+    import matplotlib.pyplot as plt
 
-    
+    try:
+        # --- Crear figura resumen Monte Carlo ---
+        fig, ax = plt.subplots(figsize=(6, 3))
+        for col in prob_df.columns:
+            ax.plot(prob_df.index + 1, prob_df[col], label=col)
+        ax.set_title("Evolución probabilística de los estados")
+        ax.set_xlabel("Pasos de simulación")
+        ax.set_ylabel("Probabilidad")
+        ax.legend(title="Estados", fontsize=8, loc="best")
+        ax.grid(True, alpha=0.3)
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", bbox_inches="tight")
+        plt.close(fig)
+
+        # Guardar en session_state
+        st.session_state["img_montecarlo"] = buf.getvalue()
+        st.session_state["estado_final_mc"] = estado_final
+        st.session_state["n_sim_mc"] = n_sim
+        st.session_state["pasos_mc"] = pasos
+        st.session_state["matriz_markov"] = pd.DataFrame(P, index=unicos, columns=unicos).round(3)
+        st.session_state["prob_df_mc"] = prob_df
+
+        st.info("💾 Resultados de Monte Carlo guardados para el informe Word.")
+    except Exception as e:
+        st.warning(f"No se pudieron guardar los resultados de Monte Carlo: {e}")
+
+
 
 # ===================== TAB 5: Control estadístico =====================
 with tab5:
@@ -1428,52 +2052,60 @@ with tab5:
         if resid is None or resid.empty:
             st.warning("⚠️ No se pudieron calcular residuales para el modelo seleccionado.")
         else:
-            st.markdown("**Fórmulas**")
-            #st.latex(r"\textbf{EWMA:}\quad z_t=\lambda x_t + (1-\lambda)z_{t-1},\ \ \sigma_z=\sigma\sqrt{\tfrac{\lambda}{2-\lambda}}")
-            #st.latex(r"\textbf{Shewhart:}\quad UCL=\bar{x}+3\sigma,\ CL=\bar{x},\ LCL=\bar{x}-3\sigma")
-            #st.latex(r"\textbf{CUSUM:}\ \ C_t^+=\max\{0, x_t-(\mu_0+k)+C_{t-1}^+\},\ \ C_t^-=\max\{0, (\mu_0-k)-x_t+C_{t-1}^-\}")
-            # ===============================================================
-            # BLOQUE EXPLICATIVO DE ECUACIONES CON LATEX RENDERIZADO
-            # ===============================================================
-            #st.markdown("## 📘 Significado de los términos en las ecuaciones")
-            
-            # --- EWMA ---
-            st.markdown("### 🔹 EWMA (Exponentially Weighted Moving Average)")
-            st.latex(r"z_t = \lambda x_t + (1-\lambda)z_{t-1}, \qquad \sigma_z = \sigma \sqrt{\tfrac{\lambda}{2-\lambda}}")
-            
-            st.write("**Definiciones:**")
-            st.write("- ", "Estadístico suavizado:", r"$z_t$ = promedio ponderado de los residuales.")
-            st.write("- ", "Residual en el instante:", r"$x_t$.")
-            st.write("- ", "Peso del dato más reciente:", r"$\lambda$, donde $0 < \lambda \le 1$.")
-            st.write("- ", "Desviación estándar esperada:", r"$\sigma_z$.")
-            st.write("- ", "Si", r"$z_t$", "supera los límites", r"$\pm 3\sigma_z$", "→ el proceso muestra **deriva o tendencia gradual.**")
-            
-            st.divider()
-            
-            # --- SHEWHART ---
-            st.markdown("### 🔹 Shewhart (Control de medias individuales)")
-            st.latex(r"UCL = \bar{x} + 3\sigma, \qquad CL = \bar{x}, \qquad LCL = \bar{x} - 3\sigma")
-            
-            st.write("**Definiciones:**")
-            st.write("- ", "Límites de control:", r"$UCL, CL, LCL$.")
-            st.write("- ", "Media histórica:", r"$\bar{x}$.")
-            st.write("- ", "Desviación estándar del proceso:", r"$\sigma$.")
-            st.write("- ", "Si algún punto excede", r"$\pm 3\sigma$", "→ **alteración puntual o dato atípico.**")
-            
-            st.divider()
-            
-            # --- CUSUM ---
-            st.markdown("### 🔹 CUSUM (Cumulative Sum)")
-            st.latex(r"C_t^+ = \max\{0, x_t - (\mu_0 + k) + C_{t-1}^+\}, \qquad C_t^- = \max\{0, (\mu_0 - k) - x_t + C_{t-1}^-\}")
-            
-            st.write("**Definiciones:**")
-            st.write("- ", "Sumas acumuladas positivas y negativas:", r"$C_t^+$ y $C_t^-$.")
-            st.write("- ", "Media objetivo:", r"$\mu_0$.")
-            st.write("- ", "Parámetro de referencia (sensibilidad):", r"$k$.")
-            st.write("- ", "Umbral o límite de decisión:", r"$h$.")
-            st.write("- ", "Si", r"$C_t^+ > h$", "o", r"$C_t^- > h$", "→ **cambio sostenido en la media del proceso.**")
+            # ==============================
+            # 📘 Sección teórica expandible
+            # ==============================
+            with st.expander("📘 Fundamento teórico de los métodos de control estadístico (EWMA, Shewhart y CUSUM)"):
+                st.markdown("**Fórmulas principales:**")
 
+                # --- EWMA ---
+                st.markdown("### 🔹 EWMA (Exponentially Weighted Moving Average)")
+                st.latex(r"z_t = \lambda x_t + (1-\lambda)z_{t-1}, \qquad \sigma_z = \sigma \sqrt{\tfrac{\lambda}{2-\lambda}}")
 
+                st.write("**Definiciones:**")
+                st.write("- Estadístico suavizado: ", r"$z_t$ = promedio ponderado de los residuales.")
+                st.write("- Residual en el instante: ", r"$x_t$.")
+                st.write("- Peso del dato más reciente: ", r"$\lambda$, con $0 < \lambda \le 1$.")
+                st.write("- Desviación estándar esperada: ", r"$\sigma_z$.")
+                st.write("- Si", r"$z_t$", "supera los límites", r"$\pm 3\sigma_z$", "→ el proceso muestra **deriva o tendencia gradual.**")
+
+                st.divider()
+
+                # --- SHEWHART ---
+                st.markdown("### 🔹 Shewhart (Control de medias individuales)")
+                st.latex(r"UCL = \bar{x} + 3\sigma, \qquad CL = \bar{x}, \qquad LCL = \bar{x} - 3\sigma")
+
+                st.write("**Definiciones:**")
+                st.write("- Límites de control:", r"$UCL, CL, LCL$.")
+                st.write("- Media histórica:", r"$\bar{x}$.")
+                st.write("- Desviación estándar del proceso:", r"$\sigma$.")
+                st.write("- Si algún punto excede", r"$\pm 3\sigma$", "→ **alteración puntual o dato atípico.**")
+
+                st.divider()
+
+                # --- CUSUM ---
+                st.markdown("### 🔹 CUSUM (Cumulative Sum)")
+                st.latex(r"C_t^+ = \max\{0, x_t - (\mu_0 + k) + C_{t-1}^+\}, \qquad C_t^- = \max\{0, (\mu_0 - k) - x_t + C_{t-1}^-\}")
+
+                st.write("**Definiciones:**")
+                st.write("- Sumas acumuladas positivas y negativas:", r"$C_t^+$ y $C_t^-$.")
+                st.write("- Media objetivo:", r"$\mu_0$.")
+                st.write("- Parámetro de referencia (sensibilidad):", r"$k$.")
+                st.write("- Umbral o límite de decisión:", r"$h$.")
+                st.write("- Si", r"$C_t^+ > h$", "o", r"$C_t^- > h$", "→ **cambio sostenido en la media del proceso.**")
+
+                st.divider()
+
+                # --- Interpretación final ---
+                st.markdown("""
+                ### 🧠 Interpretación aplicada
+                - **EWMA** detecta desviaciones graduales (deriva del proceso).
+                - **Shewhart** identifica eventos puntuales o valores atípicos.
+                - **CUSUM** detecta cambios pequeños pero sostenidos en la media.
+                
+                💬 *En el contexto del monitoreo de calidad de leche*,  
+                estos métodos permiten identificar incrementos anormales en el **conteo microbiano**, variaciones en la **temperatura del tanque** o en la **eficiencia energética**, anticipando desviaciones antes de que afecten la producción.
+                """)
 
 
             # EWMA
@@ -1737,11 +2369,27 @@ with tab7:
         safe_add_pic(doc, img_series, "Serie temporal observada")
         safe_add_pic(doc, st.session_state.get("img_fit"), "Ajuste y conjunto de prueba")
         safe_add_pic(doc, st.session_state.get("img_forecast"), "Pronóstico futuro")
-        safe_add_pic(doc, img_stl, "Descomposición estacional (STL)")
+        safe_add_pic(doc, st.session_state.get("img_stl"), "Descomposición estacional (STL)")
         safe_add_pic(doc, st.session_state.get("img_shewhart"), "Carta de control Shewhart (residuales)")
         safe_add_pic(doc, st.session_state.get("img_ewma"), "Carta de control EWMA")
         safe_add_pic(doc, st.session_state.get("img_cusum"), "Carta de control CUSUM")
         doc.add_paragraph("")
+
+        # ----------------------------------------------------------
+        # 🎲 SIMULACIÓN MONTE CARLO
+        # ----------------------------------------------------------
+        doc.add_heading("Simulación Monte Carlo", level=1)
+        if "img_montecarlo" in st.session_state:
+            safe_add_pic(doc, st.session_state["img_montecarlo"], "Evolución probabilística de los estados")
+            doc.add_paragraph(f"Se realizaron {st.session_state['n_sim_mc']} simulaciones durante {st.session_state['pasos_mc']} pasos.")
+            doc.add_paragraph(f"El estado más probable al final del horizonte fue: {st.session_state['estado_final_mc']}.")
+            doc.add_paragraph("")
+            doc.add_paragraph("Matriz de transición utilizada:")
+            tabla_mc = st.session_state["matriz_markov"]
+            for fila in tabla_mc.to_string().split("\n"):
+                doc.add_paragraph(fila, style="No Spacing")
+        else:
+            doc.add_paragraph("No se generó ninguna simulación Monte Carlo en esta sesión.")
 
         # ----------------------------------------------------------
         # 🧠 CONCLUSIONES AUTOMÁTICAS
@@ -1787,6 +2435,7 @@ with tab7:
                 f,
                 file_name=f"informe_unidad4_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
             )
+
 
 
 
