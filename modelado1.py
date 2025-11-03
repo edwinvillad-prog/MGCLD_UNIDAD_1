@@ -438,7 +438,7 @@ if archivo is not None:
                             st.pyplot(fig3d, use_container_width=False)
 
                         # --- Ecuación multivariable en LaTeX ---
-                        st.subheader("📌 Ecuación del modelo final (formato LaTeX)")
+                        st.subheader("📌 Ecuación del modelo final")
 
                         eq_parts_final = [f"{y_var} = {model_final.params.get('Intercept', 0):.3f}"]
                         for term in sig_vars:
@@ -610,6 +610,7 @@ if archivo is not None:
                     - Eliminación de atípicos o variables irrelevantes.
                     - Reajuste del modelo incluyendo interacciones o términos polinomiales.
                     """)
+
 
 
 
