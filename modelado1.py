@@ -283,7 +283,7 @@ if archivo is not None:
             else:
                 try:
                     # --- ANOVA clásico ---
-                    anova_tabla = anova_lm(model, typ=3)
+                    anova_tabla = anova_lm(model, typ=1)
                     st.dataframe(anova_tabla)
 
                     # --- Gráfico de suma de cuadrados ---
@@ -610,4 +610,5 @@ if archivo is not None:
                     - Eliminación de atípicos o variables irrelevantes.
                     - Reajuste del modelo incluyendo interacciones o términos polinomiales.
                     """)
+
 
