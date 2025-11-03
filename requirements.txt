@@ -1,15 +1,15 @@
 streamlit>=1.38.0
+pandas>=2.2.0
+numpy>=1.26.0
+scipy>=1.12.0
 plotly>=5.23.0
 qrcode
 streamlit-option-menu
+statsmodels
 matplotlib
 openpyxl
 python-docx
 seaborn
-pandas==1.5.3
-numpy==1.24.4
-scipy==1.10.1
-statsmodels==0.13.5
 
 
 
