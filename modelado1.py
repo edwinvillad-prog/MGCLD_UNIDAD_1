@@ -231,7 +231,7 @@ if archivo is not None:
                 st.stop()
 
             # --- Construcción de fórmula ---
-            formula = f"{y_var} ~ " + " + ".join(X_numeric)
+            formula = f"{y_var} ~ 1 + " + " + ".join(X_numeric)
             st.markdown(f"**Fórmula generada:** {formula}")
 
             # --- Ajustar el modelo ---
@@ -610,5 +610,6 @@ if archivo is not None:
                     - Eliminación de atípicos o variables irrelevantes.
                     - Reajuste del modelo incluyendo interacciones o términos polinomiales.
                     """)
+
 
 
