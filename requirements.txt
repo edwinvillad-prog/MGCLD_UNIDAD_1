@@ -8,6 +8,7 @@ streamlit-option-menu
 statsmodels
 matplotlib
 openpyxl
-seaborn
 python-docx
+seaborn==0.12.2
+
 
