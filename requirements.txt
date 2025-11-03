@@ -9,6 +9,6 @@ statsmodels
 matplotlib
 openpyxl
 python-docx
-seaborn==0.12.2
+seaborn
 
 
